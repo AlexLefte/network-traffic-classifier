@@ -20,49 +20,11 @@ from src.pcap_ingest import pcap_reader_generator, normalize_flow_key
 from src.flow_aggregator import aggregate_flows
 from src.feature_extractor import extract_all_features, ExtractedFeatures
 
-def simulate_pcap(filepath: str):
-    """
-    Creează un fișier PCAP simulat, modelând traficul în rafală (bursty) al YouTube.
-    """
-    start_time = 1678886400.0 
-
-    # Flux 1: Trafic scurt
-    p1 = Ether()/IP(src="192.168.1.10", dst="172.217.0.1")/TCP(sport=12345, dport=443, flags='S')
-    p1.time = start_time + 0.0
-    p2 = Ether()/IP(src="172.217.0.1", dst="192.168.1.10")/TCP(sport=443, dport=12345, flags='A')
-    p2.time = start_time + 0.01
-
-    # Flux 2: Trafic de streaming (Rafală de date B->A)
-    p3 = Ether()/IP(src="192.168.1.10", dst="203.0.113.5")/TCP(sport=50000, dport=443, flags='A')
-    p3.time = start_time + 1.0
-    
-    p4 = Ether()/IP(src="203.0.113.5", dst="192.168.1.10")/TCP(sport=443, dport=50000, flags='A')
-    p4.time = start_time + 1.1 
-    p4[IP].len = 1500 
-    
-    p5 = p4.copy() 
-    p5.time = start_time + 1.15
-    p5[IP].len = 1500 
-    
-    p6 = p4.copy() 
-    p6.time = start_time + 1.25
-    p6[IP].len = 800 
-    
-    p7 = Ether()/IP(src="192.168.1.10", dst="203.0.113.5")/TCP(sport=50000, dport=443, flags='A')
-    p7.time = start_time + 10.0
-
-    packets = [p1, p2, p3, p4, p5, p6, p7]
-    wrpcap(filepath, packets)
-    print(f"Fișier PCAP simulat creat la: {filepath} ({len(packets)} pachete)")
-
 
 def run_pipeline(pcap_path: str, output_path: str, timeout: float):
     """
     Orchestrează întregul proces de extracție a feature-urilor în stil modular. [7]
     """
-    if not os.path.exists(pcap_path):
-        simulate_pcap(pcap_path)
-
     print(f"\nÎncepe procesarea în streaming a fișierului: {pcap_path}")
 
     # Pasul 1: Ingestie & Normalizare
