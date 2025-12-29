@@ -41,7 +41,10 @@ def aggregate_flows(normalized_packets: Iterator[NormalizedPacket],
             duration = end_ts - start_ts
             packet_count = len(pkts)
             # try common length fields, fallback to 0
-            total_bytes = sum(p.get('length', p.get('ip_len', p.get('payload_len', 0))) for p in pkts)
+            total_bytes = sum(p.get('length', p.get('ip_len', p.get('pkt_len', 0))) for p in pkts)
+            if total_bytes == 0:
+                for key, val in packet.items():
+                    print(f"Packet field: {key} = {val}")
 
             flow_summary: CompleteFlow = {
                 'flow_key': key,
@@ -50,7 +53,8 @@ def aggregate_flows(normalized_packets: Iterator[NormalizedPacket],
                 'duration': duration,
                 'packet_count': packet_count,
                 'total_bytes': total_bytes,
-                'init_dir': init_dir
+                'init_dir': init_dir,
+                'protocol': key.protocol if hasattr(key, 'protocol') else key[4]
             }
 
             if include_packets:
@@ -76,7 +80,7 @@ def aggregate_flows(normalized_packets: Iterator[NormalizedPacket],
         end_ts = pkts[-1]['timestamp']
         duration = end_ts - start_ts
         packet_count = len(pkts)
-        total_bytes = sum(p.get('length', p.get('ip_len', p.get('payload_len', 0))) for p in pkts)
+        total_bytes = sum(p.get('length', p.get('ip_len', p.get('pkt_len', 0))) for p in pkts)
 
         flow_summary: CompleteFlow = {
             'flow_key': flow_key,
@@ -85,7 +89,8 @@ def aggregate_flows(normalized_packets: Iterator[NormalizedPacket],
             'duration': duration,
             'packet_count': packet_count,
             'total_bytes': total_bytes,
-            'init_dir': init_dir
+            'init_dir': init_dir,
+            'protocol': key.protocol if hasattr(key, 'protocol') else key[4]
         }
 
         if include_packets:

@@ -29,7 +29,7 @@ T2I = {
     "netflix": 10,
     "spotify": 11, 
     "vimeo" : 12,
-    "youTube": 13,
+    "youtube": 13,
 
     # VOIP
     "facebook_audio": 14,
@@ -64,7 +64,7 @@ def main():
     # Process each PCAP file
     for pcap_path in tqdm(pcap_files):
         # Get traffic type from filename
-        pcap_name = os.path.basename(pcap_path).split("_")[0].lower()
+        pcap_name = os.path.basename(pcap_path).lower()
         traffic_type = None
         for k in T2I.keys():
             if k in pcap_name:
@@ -81,7 +81,8 @@ def main():
         )
         
         # Aggregate flows
-        flows = aggregate_flows(packets_generator, args.flow_interval)
+        flows = aggregate_flows(packets_generator, 
+                                args.flow_interval)
         rows = []
         for flow in flows:
             feats = extract_features_from_flow(flow)
