@@ -10,7 +10,7 @@ def read_csv(filepath, id_column='ID', test_size=0.2, random_state=42):
     df = pd.read_csv("flows.csv")
     #
     # Map labels to binary 
-    labels_of_interest = [16]  # skype_voice
+    labels_of_interest = [14]  # skype_voice
     df['binary_label'] = df['Label'].apply(lambda x: 1 if x in labels_of_interest else 0)
     #
     # Split features / labels 
@@ -37,6 +37,8 @@ def read_csv(filepath, id_column='ID', test_size=0.2, random_state=42):
     X_train_scaled = X_train_scaled.fillna(-1)
     X_val_scaled = X_val_scaled.fillna(-1)
     X_test_scaled = X_test_scaled.fillna(-1)
+    #
+    print("Done reading csv")
     #
     return X_train_scaled, y_train, X_val_scaled, y_val, X_test_scaled, y_test
 

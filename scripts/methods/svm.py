@@ -54,6 +54,7 @@ if __name__ == "__main__":
                     #
                     OUT_train = MODEL.predict(X_train_split)
                     OUT_val = MODEL.predict(X_val_split)
+                    OUT_test = MODEL.predict(X_test_split)
                     #
                     # Train metrics
                     acc_train = accuracy_score(Y_train, OUT_train)
@@ -63,7 +64,11 @@ if __name__ == "__main__":
                     acc_val = accuracy_score(Y_val, OUT_val)
                     f1_val = f1_score(Y_val, OUT_val, average='weighted')
                     print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
-                    METRIX += [acc_train, f1_train, acc_val, f1_val]
+                    #
+                    acc_test = accuracy_score(Y_test, OUT_test)
+                    f1_test = f1_score(Y_test, OUT_test, average='weighted')
+                    print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
+                    METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
                 #
                 if f1_val > best_val_score:
                     best_val_score = f1_val
