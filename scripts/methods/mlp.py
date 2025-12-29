@@ -252,7 +252,7 @@ if __name__ == '__main__':
                 print(f"New best model found with hidden_layers: {' '.join(map(str, hidden_sizes))}, Dropout: {dropout}, Val Mean UA: {best_val_score:.2f}")
                 #    
                 # Save best model
-                with open(f"models/best_mlp_{'_'.join(map(str, hidden_sizes))}_{dropout}_{acc_val_avg}_{f1_val_avg}.pkl", "wb") as f:
+                with open(f"models/best_mlp_{'_'.join(map(str, hidden_sizes))}_{dropout}_{acc_val}_{f1_val}.pkl", "wb") as f:
                     pickle.dump(best_model, f)
             #    
             idx_sim += 1
