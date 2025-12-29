@@ -68,7 +68,7 @@ if __name__ == "__main__":
                     #
                     acc_test = accuracy_score(Y_test, OUT_test)
                     f1_test = f1_score(Y_test, OUT_test, average='weighted')
-                    print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
+                    print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}')
                     METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
                 #
                 if f1_val > best_val_score:

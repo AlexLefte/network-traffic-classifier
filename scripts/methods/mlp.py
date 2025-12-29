@@ -80,19 +80,19 @@ if __name__ == '__main__':
                 # Define the tensors
                 X_train_tensor = torch.tensor(X_train_split, dtype=torch.float32).to(device)
                 Y_train_tensor = torch.tensor(Y_train, dtype=torch.long).to(device)
-                X_val_tensor = torch.tensor(X_val_split, dtype=torch.float32).to(device)
-                Y_val_tensor = torch.tensor(Y_val, dtype=torch.long).to(device)
-                X_test_tensor = torch.tensor(X_test_split, dtype=torch.float32).to(device)
-                Y_test_tensor = torch.tensor(Y_test, dtype=torch.long).to(device)
+                X_val_tensor   = torch.tensor(X_val_split, dtype=torch.float32).to(device)
+                Y_val_tensor   = torch.tensor(Y_val, dtype=torch.long).to(device)
+                X_test_tensor  = torch.tensor(X_test_split, dtype=torch.float32).to(device)
+                Y_test_tensor  = torch.tensor(Y_test, dtype=torch.long).to(device)
                 #
                 # Create DataLoaders
                 train_dataset = TensorDataset(X_train_tensor, Y_train_tensor)
-                val_dataset = TensorDataset(X_val_tensor, Y_val_tensor)
-                test_dataset = TensorDataset(X_test_tensor, Y_test_tensor)
+                val_dataset   = TensorDataset(X_val_tensor, Y_val_tensor)
+                test_dataset  = TensorDataset(X_test_tensor, Y_test_tensor)
                 #
                 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-                val_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+                val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+                test_loader  = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
                 #
                 # Model, Loss, Optimizer
                 MODEL = MLP(input_size, hidden_sizes, output_size, dropout).to(device)
@@ -101,7 +101,8 @@ if __name__ == '__main__':
                 #
                 # Training Loop with Loss Tracking
                 train_losses = []
-                val_losses = []
+                val_losses   = []
+                test_losses  = []
                 #
                 # Early stopping parameters
                 early_stop_patience = 10  # Number of epochs to wait for improvement
@@ -182,12 +183,23 @@ if __name__ == '__main__':
                     val_outputs = np.concatenate(val_outputs)
                     val_targets = np.concatenate(val_targets)
                     #
+                    test_outputs = []
+                    test_targets = []
+                    for inputs, targets in test_loader:
+                        outputs = MODEL(inputs).cpu().numpy()
+                        test_outputs.append(outputs)
+                        test_targets.append(targets.cpu().numpy())
+                    test_outputs = np.concatenate(test_outputs)
+                    test_targets = np.concatenate(test_targets)
+                    #
                     train_predictions = np.argmax(train_outputs, axis=1)
-                    val_predictions = np.argmax(val_outputs, axis=1)
+                    val_predictions   = np.argmax(val_outputs, axis=1)
+                    test_predictions  = np.argmax(test_outputs, axis=1)
                     #
                     # Plot Confusion Matrices
                     plot_confusion_matrix(train_targets, train_predictions, "Confusion Matrix - Train")
                     plot_confusion_matrix(val_targets, val_predictions, "Confusion Matrix - Validation")
+                    plot_confusion_matrix(test_targets, test_predictions, "Confusion Matrix - Test")
                 #    
                 acc_train = accuracy_score(train_targets, train_predictions)
                 f1_train = f1_score(train_targets, train_predictions, average='weighted')
@@ -199,7 +211,10 @@ if __name__ == '__main__':
                 f1_val = f1_score(val_targets, val_predictions, average='weighted')
                 print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
                 #
-                METRIX += [acc_train, f1_train, acc_val, f1_val]
+                acc_test = accuracy_score(test_targets, test_predictions)
+                f1_test = f1_score(test_targets, test_predictions, average='weighted')
+                print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}')
+                METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
             #
             if f1_val > best_val_score:
                 best_val_score = f1_val

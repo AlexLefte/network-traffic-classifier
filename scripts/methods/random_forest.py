@@ -14,6 +14,7 @@ if __name__ == '__main__':
     #
     # Datasets
     root_path = ""
+    file_path = "flows.csv"
     #
     # Hyperparameters
     estimators = list(range(5, 20, 5))
@@ -33,6 +34,10 @@ if __name__ == '__main__':
     best_model = None
     best_val_score = -float('inf')
     #
+    # Read and shuffle the data
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+    X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
+    #
     for es in estimators:
       for mss in min_samples_split:
         for md in max_depth:
@@ -40,29 +45,29 @@ if __name__ == '__main__':
             for ms in max_samples:
               for mf in max_features:
                 METRIX = []
-                for file_path in enumerate(root_path):
-                  #
-                  # Read and shuffle the data
-                  X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
-                  X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
-                  #
-                  # Create the model
-                  MODEL = RF(n_estimators=es, min_samples_split=mss, max_depth=md,
-                      min_samples_leaf=msl, max_samples=ms, max_features=mf)
-                  MODEL.fit(X_train_split, Y_train)
-                  #
-                  OUT_train = MODEL.predict(X_train_split)
-                  OUT_val   = MODEL.predict(X_val_split)
-                  #
-                  # Train metrics
-                  acc_train = accuracy_score(Y_train, OUT_train)
-                  f1_train = f1_score(Y_train, OUT_train, average='weighted')
-                  print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}')
-                  #
-                  acc_val = accuracy_score(Y_val, OUT_val)
-                  f1_val = f1_score(Y_val, OUT_val, average='weighted')
-                  print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
-                  METRIX += [acc_train, f1_train, acc_val, f1_val]
+                #
+                # Create the model
+                MODEL = RF(n_estimators=es, min_samples_split=mss, max_depth=md,
+                    min_samples_leaf=msl, max_samples=ms, max_features=mf)
+                MODEL.fit(X_train_split, Y_train)
+                #
+                OUT_train = MODEL.predict(X_train_split)
+                OUT_val   = MODEL.predict(X_val_split)
+                OUT_test  = MODEL.predict(X_test_split)
+                #
+                # Train metrics
+                acc_train = accuracy_score(Y_train, OUT_train)
+                f1_train = f1_score(Y_train, OUT_train, average='weighted')
+                print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}')
+                #
+                acc_val = accuracy_score(Y_val, OUT_val)
+                f1_val = f1_score(Y_val, OUT_val, average='weighted')
+                print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
+                #
+                acc_test = accuracy_score(Y_test, OUT_test)
+                f1_test = f1_score(Y_test, OUT_test, average='weighted')
+                print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}')
+                METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
                 #
                 # Update best model if current is better
                 if f1_val > best_val_score:
