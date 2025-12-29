@@ -9,37 +9,10 @@ import torch.nn       as nn
 import torch.optim    as optim
 from torch.utils.data import DataLoader, TensorDataset
 #
-from time                    import time
+from utils                   import read_csv
 from sklearn.utils           import shuffle
-from sklearn.model_selection import train_test_split
 from sklearn.metrics         import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics         import accuracy_score, f1_score
-from sklearn.model_selection import train_test_split
-#
-# Helper function
-def read_csv(filepath, id_column='ID', test_size=0.2, random_state=42):
-    #
-    # Read the CSV file
-    df = pd.read_csv(filepath)
-    #
-    # Drop the ID column if it exists
-    if id_column in df.columns:
-        df = df.drop(columns=[id_column])
-    #
-    # Separate features (X) and target (y)
-    # Assumes the last column is the target variable
-    X = df.iloc[:, :-1]
-    y = df.iloc[:, -1]
-    #
-    # Get feature names
-    feature_names = X.columns.tolist()
-    #
-    # Split into training and testing sets
-    X_train, X_test, Y_train, Y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-    #
-    return X_train, Y_train, X_test, Y_test  
 #
 # Define MLP Model
 class MLP(nn.Module):
@@ -101,7 +74,7 @@ if __name__ == '__main__':
             for split_index, file_path in enumerate(file_path):
                 #
                 # Read and shuffle data
-                X_train_split, Y_train, X_val_split, Y_val = read_csv(file_path)
+                X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
                 X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
                 #
                 # Define the tensors
@@ -109,13 +82,17 @@ if __name__ == '__main__':
                 Y_train_tensor = torch.tensor(Y_train, dtype=torch.long).to(device)
                 X_val_tensor = torch.tensor(X_val_split, dtype=torch.float32).to(device)
                 Y_val_tensor = torch.tensor(Y_val, dtype=torch.long).to(device)
+                X_test_tensor = torch.tensor(X_test_split, dtype=torch.float32).to(device)
+                Y_test_tensor = torch.tensor(Y_test, dtype=torch.long).to(device)
                 #
                 # Create DataLoaders
                 train_dataset = TensorDataset(X_train_tensor, Y_train_tensor)
                 val_dataset = TensorDataset(X_val_tensor, Y_val_tensor)
+                test_dataset = TensorDataset(X_test_tensor, Y_test_tensor)
                 #
                 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
                 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+                val_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
                 #
                 # Model, Loss, Optimizer
                 MODEL = MLP(input_size, hidden_sizes, output_size, dropout).to(device)
@@ -224,28 +201,6 @@ if __name__ == '__main__':
                 #
                 METRIX += [acc_train, f1_train, acc_val, f1_val]
             #
-            # Append results
-            # -> Cross-validation results:
-            # acc_train_avg = f1_train_avg = acc_val_avg = f1_val_avg = 0
-            # L = len(METRIX)
-            # for i in range(0, L, 4):
-            #     acc_train_avg += METRIX[i]
-            # acc_train_avg = np.round(acc_train_avg/5, decimals=2)
-            # for i in range(1, L, 4):
-            #     f1_train_avg += METRIX[i]
-            # f1_train_avg = np.round(f1_train_avg/5, decimals=2)
-            # for i in range(2, L, 4):
-            #     acc_val_avg += METRIX[i]
-            # acc_val_avg = np.round(acc_val_avg/5, decimals=2)
-            # for i in range(3, L, 4):
-            #     f1_val_avg += METRIX[i]
-            # f1_val_avg = np.round(f1_val_avg/5, decimals=2)
-            # print(f'Acc avg (train) = {acc_train_avg}. F1 avg (train) = {f1_train_avg}')
-            # print(f'Acc avg (val) = {acc_val_avg}. F1 avg (val) = {f1_val_avg}\n')
-            # METRIX_[idx_sim,:] = [acc_train_avg, f1_train_avg,
-            #                     acc_val_avg, f1_val_avg]
-            #    
-            # Update best model if current is better
             if f1_val > best_val_score:
                 best_val_score = f1_val
                 best_model = MODEL

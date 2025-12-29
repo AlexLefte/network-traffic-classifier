@@ -3,38 +3,11 @@ import pickle
 import numpy  as np
 import pandas as pd
 #
-from time                    import time
-#
 from sklearn.svm             import SVC
 from sklearn.decomposition   import PCA
 from sklearn.utils           import shuffle
 from sklearn.metrics         import accuracy_score, f1_score
-from sklearn.model_selection import train_test_split
-#
-# Helper function
-def read_csv(filepath, id_column='ID', test_size=0.2, random_state=42):
-    #
-    # Read the CSV file
-    df = pd.read_csv(filepath)
-    #
-    # Drop the ID column if it exists
-    if id_column in df.columns:
-        df = df.drop(columns=[id_column])
-    #
-    # Separate features (X) and target (y)
-    # Assumes the last column is the target variable
-    X = df.iloc[:, :-1]
-    y = df.iloc[:, -1]
-    #
-    # Get feature names
-    feature_names = X.columns.tolist()
-    #
-    # Split into training and testing sets
-    X_train, X_test, Y_train, Y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-    #
-    return X_train, Y_train, X_test, Y_test  
+from utils                   import read_csv
 #
 if __name__ == "__main__":
     #
@@ -58,68 +31,46 @@ if __name__ == "__main__":
     best_val_score = -float('inf')
     #
     # Retrieve the csv paths
-    file_paths = [os.path.join(root_path, f"<>.csv")]
+    file_path = [os.path.join(root_path, f"flows.csv")]
     #
     for pca_comp in PCA_components:
         for SVM_kernel in SVM_kernels:
             for C in Cs:
                 for gamma in gammas:
                     METRIX = []
-                    for split_index, file_path in enumerate(file_paths):
-                        #
-                        # Read and shffle the data
-                        X_train_split, Y_train, X_val_split, Y_val = read_csv(file_path)
-                        X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
-                        #
-                        # Perform PCA for feature reduction
-                        if pca_comp != 'no_pca':
-                            pca = PCA(n_components=pca_comp)
-                            X_train_split = pca.fit_transform(X_train_split)
-                            X_val_split = pca.transform(X_val_split)
-                        #
-                        MODEL = SVC(C=C, kernel=SVM_kernel, tol=1.0)
-                        MODEL.fit(X_train_split, Y_train)
-                        #
-                        OUT_train = MODEL.predict(X_train_split)
-                        OUT_val = MODEL.predict(X_val_split)
-                        #
-                        # Train metrics
-                        acc_train = accuracy_score(Y_train, OUT_train)
-                        f1_train = f1_score(Y_train, OUT_train, average='weighted')
-                        print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}')
-                        #
-                        acc_val = accuracy_score(Y_val, OUT_val)
-                        f1_val = f1_score(Y_val, OUT_val, average='weighted')
-                        print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
-                        METRIX += [acc_train, f1_train, acc_val, f1_val]
-                    # #
-                    # # -> Cross-validation results:
-                    # acc_train_avg = f1_train_avg = acc_val_avg = f1_val_avg = 0
-                    # L = len(METRIX)
-                    # for i in range(0, L, 4):
-                    #     acc_train_avg += METRIX[i]
-                    # acc_train_avg = np.round(acc_train_avg/5, decimals=2)
-                    # for i in range(1, L, 4):
-                    #     f1_train_avg += METRIX[i]
-                    # f1_train_avg = np.round(f1_train_avg/5, decimals=2)
-                    # for i in range(2, L, 4):
-                    #     acc_val_avg += METRIX[i]
-                    # acc_val_avg = np.round(acc_val_avg/5, decimals=2)
-                    # for i in range(3, L, 4):
-                    #     f1_val_avg += METRIX[i]
-                    # f1_val_avg = np.round(f1_val_avg/5, decimals=2)
-                    # print(f'Acc avg (train) = {acc_train_avg}. F1 avg (train) = {f1_train_avg}')
-                    # print(f'Acc avg (val) = {acc_val_avg}. F1 avg (val) = {f1_val_avg}\n')
-                    # METRIX_[idx_sim,:] = [acc_train_avg, f1_train_avg,
-                    #                     acc_val_avg, f1_val_avg]
                     #
-                    # Update best model if current is better
-                    if f1_val > best_val_score:
-                        best_val_score = f1_val
-                        best_model = MODEL
-                        print(f"New best model found with PCA: {pca_comp}, Kernel: {SVM_kernel}, C: {C}, gamma {gamma}, Val Mean UA: {best_val_score:.2f}")
+                    # Read and shffle the data
+                    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+                    X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
                     #
-                    idx_sim += 1
+                    # Perform PCA for feature reduction
+                    if pca_comp != 'no_pca':
+                        pca = PCA(n_components=pca_comp)
+                        X_train_split = pca.fit_transform(X_train_split)
+                        X_val_split = pca.transform(X_val_split)
+                    #
+                    MODEL = SVC(C=C, kernel=SVM_kernel, tol=1.0)
+                    MODEL.fit(X_train_split, Y_train)
+                    #
+                    OUT_train = MODEL.predict(X_train_split)
+                    OUT_val = MODEL.predict(X_val_split)
+                    #
+                    # Train metrics
+                    acc_train = accuracy_score(Y_train, OUT_train)
+                    f1_train = f1_score(Y_train, OUT_train, average='weighted')
+                    print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}')
+                    #
+                    acc_val = accuracy_score(Y_val, OUT_val)
+                    f1_val = f1_score(Y_val, OUT_val, average='weighted')
+                    print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
+                    METRIX += [acc_train, f1_train, acc_val, f1_val]
+                #
+                if f1_val > best_val_score:
+                    best_val_score = f1_val
+                    best_model = MODEL
+                    print(f"New best model found with PCA: {pca_comp}, Kernel: {SVM_kernel}, C: {C}, gamma {gamma}, Val Mean UA: {best_val_score:.2f}")
+                #
+                idx_sim += 1
     #
     # Save best model
     exp_name = 'svc'
@@ -128,8 +79,8 @@ if __name__ == "__main__":
     model_path = os.path.join(model_path, f"best_svc_configs.pkl")
     #
     # Read the data
-    X_train_split, Y_train, X_val_split, Y_val = read_csv(file_paths[0])
-    X_train_split = np.concatenate((X_train_split, X_val_split), axis=0)
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+    X_train_split = np.concatenate((X_train_split, X_val_split, X_test_split), axis=0)
     Y_train = np.concatenate((Y_train, Y_val), axis=0)
     #
     # Shuffle data

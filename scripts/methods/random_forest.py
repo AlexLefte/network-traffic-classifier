@@ -4,37 +4,10 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 #
-from time import time
-#
 from sklearn.ensemble         import RandomForestClassifier as RF
 from sklearn.utils            import shuffle
 from sklearn.metrics          import accuracy_score, f1_score
-from sklearn.model_selection  import train_test_split
-#
-# Helper function
-def read_csv(filepath, id_column='ID', test_size=0.2, random_state=42):
-    #
-    # Read the CSV file
-    df = pd.read_csv(filepath)
-    #
-    # Drop the ID column if it exists
-    if id_column in df.columns:
-        df = df.drop(columns=[id_column])
-    #
-    # Separate features (X) and target (y)
-    # Assumes the last column is the target variable
-    X = df.iloc[:, :-1]
-    y = df.iloc[:, -1]
-    #
-    # Get feature names
-    feature_names = X.columns.tolist()
-    #
-    # Split into training and testing sets
-    X_train, X_test, Y_train, Y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-    #
-    return X_train, Y_train, X_test, Y_test  
+from utils                    import read_csv
 #
 #
 if __name__ == '__main__':
@@ -70,7 +43,7 @@ if __name__ == '__main__':
                 for file_path in enumerate(root_path):
                   #
                   # Read and shuffle the data
-                  X_train_split, Y_train, X_val_split, Y_val = read_csv(file_path)
+                  X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
                   X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
                   #
                   # Create the model
@@ -90,27 +63,7 @@ if __name__ == '__main__':
                   f1_val = f1_score(Y_val, OUT_val, average='weighted')
                   print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
                   METRIX += [acc_train, f1_train, acc_val, f1_val]
-                # #
-                # # -> Cross-validation results:
-                # acc_train_avg = f1_train_avg = acc_val_avg = f1_val_avg = 0
-                # L = len(METRIX)
-                # for i in range(0, L, 4):
-                #     acc_train_avg += METRIX[i]
-                # acc_train_avg = np.round(acc_train_avg/5, decimals=2)
-                # for i in range(1, L, 4):
-                #     f1_train_avg += METRIX[i]
-                # f1_train_avg = np.round(f1_train_avg/5, decimals=2)
-                # for i in range(2, L, 4):
-                #     acc_val_avg += METRIX[i]
-                # acc_val_avg = np.round(acc_val_avg/5, decimals=2)
-                # for i in range(3, L, 4):
-                #     f1_val_avg += METRIX[i]
-                # f1_val_avg = np.round(f1_val_avg/5, decimals=2)
-                # print(f'Acc avg (train) = {acc_train_avg}. F1 avg (train) = {f1_train_avg}')
-                # print(f'Acc avg (val) = {acc_val_avg}. F1 avg (val) = {f1_val_avg}\n')
-                # METRIX_[idx_sim,:] = [acc_train_avg, f1_train_avg,
-                #                     acc_val_avg, f1_val_avg]
-
+                #
                 # Update best model if current is better
                 if f1_val > best_val_score:
                     best_val_score = f1_val
@@ -148,9 +101,9 @@ if __name__ == '__main__':
       os.makedirs(os.path.dirname(file_path), exist_ok=True)
       #
       # Read the data
-      X_train_split, Y_train, X_val_split, Y_val = read_csv(file_path)
-      X_train_split = np.concatenate((X_train_split, X_val_split), axis=0)
-      Y_train = np.concatenate((Y_train, Y_val), axis=0)
+      X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+      X_train_split = np.concatenate((X_train_split, X_val_split, X_test_split), axis=0)
+      Y_train = np.concatenate((Y_train, Y_val, Y_test), axis=0)
       #
       # Shuffle data
       X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
