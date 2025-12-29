@@ -15,7 +15,7 @@ if __name__ == "__main__":
     root_path = ""
     #
     # Hyperparameters
-    PCA_components = ['no_pca', 25, 30, 35, 40]
+    PCA_components = ['no_pca', 5, 10, 15, 20, 25]
     SVM_kernels = ['rbf']
     Cs = [20, 10, 1, 5e-1, 1e-1]
     gammas = ['scale']
@@ -48,6 +48,7 @@ if __name__ == "__main__":
                         pca = PCA(n_components=pca_comp)
                         X_train_split = pca.fit_transform(X_train_split)
                         X_val_split = pca.transform(X_val_split)
+                        X_test_split = pca.transform(X_test_split)
                     #
                     MODEL = SVC(C=C, kernel=SVM_kernel, tol=1.0)
                     MODEL.fit(X_train_split, Y_train)
