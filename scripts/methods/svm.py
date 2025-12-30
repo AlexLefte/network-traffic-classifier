@@ -1,5 +1,6 @@
 import os
 import pickle
+import argparse
 import numpy  as np
 import pandas as pd
 #
@@ -11,9 +12,13 @@ from utils                      import read_csv
 from sklearn.utils.class_weight import compute_sample_weight
 #
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--csv_file", type=str, required=True)
+    args = parser.parse_args()
     #
-    # Dataset
+    # Datasets
     root_path = ""
+    file_path = args.csv_file
     #
     # Hyperparameters
     PCA_components = ['no_pca', 5, 10, 15, 20, 25]

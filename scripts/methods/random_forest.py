@@ -2,6 +2,7 @@ import numpy  as np
 import pandas as pd
 import os
 import pickle
+import argparse
 import matplotlib.pyplot as plt
 #
 from sklearn.ensemble           import RandomForestClassifier as RF
@@ -12,10 +13,13 @@ from sklearn.utils.class_weight import compute_sample_weight
 #
 #
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--csv_file", type=str, required=True)
+    args = parser.parse_args()
     #
     # Datasets
     root_path = ""
-    file_path = "flows.csv"
+    file_path = args.csv_file
     #
     # Hyperparameters
     estimators = list(range(5, 20, 5))
@@ -25,9 +29,7 @@ if __name__ == '__main__':
     max_samples = [0.3, 0.4, 0.5, 0.6, 0.7]
     max_features = ['sqrt', 'log2']
     #
-    # Compute no simulations to perform
     Nsim = len(estimators)*len(min_samples_split)*len(max_depth)*len(min_samples_leaf)*len(max_samples)*len(max_features)
-    #
     idx_sim = 0
     METRIX_ = np.zeros((Nsim, 4))
     #
