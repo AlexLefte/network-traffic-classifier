@@ -3,8 +3,6 @@
 import numpy as np
 from scipy.stats import kurtosis, skew
 import hashlib
-from typing import Iterator
-from flow_aggregator import CompleteFlow
 
 # Basic statistical functions
 def compute_stats(arr):
@@ -24,7 +22,7 @@ def compute_iat(packets):
             return np.diff(ts) if len(ts) > 1 else np.array([]) 
 
 # Main extraction function
-def extract_features_from_flow(flow: CompleteFlow) -> dict:
+def extract_features_from_flow(flow) -> dict:
     features = {}
     pkts = flow.get("packets", [])
     

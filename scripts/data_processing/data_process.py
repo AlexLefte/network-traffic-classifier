@@ -56,11 +56,12 @@ def main():
         pcap_files = [
             os.path.join(args.pcap, f)
             for f in os.listdir(args.pcap)
-            if f.endswith(".pcap") or f.endswith(".pcapng")
+            if f.endswith(".pcap")
+            # if f.endswith(".pcap") or f.endswith(".pcapng")
         ]
     else:
         pcap_files = [args.pcap]
-       
+    print(f"Found {len(pcap_files)} PCAP files to process.")
     # Process each PCAP file
     for pcap_path in tqdm(pcap_files):
         # Get traffic type from filename
@@ -88,7 +89,6 @@ def main():
             feats = extract_features_from_flow(flow)
             feats["Label"] = traffic_type
             rows.append(feats)
-            break  # TODO: delete later
 
         # Save features to CSV
         df = pd.DataFrame(rows)
