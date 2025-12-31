@@ -1,18 +1,24 @@
 import os
 import pickle
+import argparse
 import numpy  as np
 import pandas as pd
 #
-from sklearn.svm             import SVC
-from sklearn.decomposition   import PCA
-from sklearn.utils           import shuffle
-from sklearn.metrics         import accuracy_score, f1_score
-from utils                   import read_csv
+from sklearn.svm                import SVC
+from sklearn.decomposition      import PCA
+from sklearn.utils              import shuffle
+from sklearn.metrics            import accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support
+from utils                      import read_csv
+from sklearn.utils.class_weight import compute_sample_weight
 #
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--csv_file", type=str, required=True)
+    args = parser.parse_args()
     #
-    # Dataset
+    # Datasets
     root_path = ""
+    file_path = args.csv_file
     #
     # Hyperparameters
     PCA_components = ['no_pca', 5, 10, 15, 20, 25]
@@ -31,17 +37,20 @@ if __name__ == "__main__":
     best_val_score = -float('inf')
     #
     # Retrieve the csv paths
-    file_path = [os.path.join(root_path, f"flows.csv")]
+    file_path = os.path.join(root_path, f"flows.csv")
+    #
+    # Read and shffle the data
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+    X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
+    #
+    weights = compute_sample_weight(class_weight='balanced', y=Y_train)
+    print(f"Weights: {np.unique(weights)}")
     #
     for pca_comp in PCA_components:
         for SVM_kernel in SVM_kernels:
             for C in Cs:
                 for gamma in gammas:
                     METRIX = []
-                    #
-                    # Read and shffle the data
-                    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
-                    X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
                     #
                     # Perform PCA for feature reduction
                     if pca_comp != 'no_pca':
@@ -51,32 +60,44 @@ if __name__ == "__main__":
                         X_test_split = pca.transform(X_test_split)
                     #
                     MODEL = SVC(C=C, kernel=SVM_kernel, tol=1.0)
-                    MODEL.fit(X_train_split, Y_train)
+                    MODEL.fit(X_train_split, Y_train, sample_weight=weights)
                     #
                     OUT_train = MODEL.predict(X_train_split)
-                    OUT_val = MODEL.predict(X_val_split)
-                    OUT_test = MODEL.predict(X_test_split)
+                    OUT_val   = MODEL.predict(X_val_split)
+                    OUT_test  = MODEL.predict(X_test_split)
                     #
                     # Train metrics
                     acc_train = accuracy_score(Y_train, OUT_train)
-                    f1_train = f1_score(Y_train, OUT_train, average='weighted')
-                    print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}')
+                    # f1_train = f1_score(Y_train, OUT_train, average='weighted')
+                    precision_train, recall_train, f1_train, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
+                    print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}. precision (train) = {precision_train}. recall (train) = {recall_train}')
                     #
                     acc_val = accuracy_score(Y_val, OUT_val)
-                    f1_val = f1_score(Y_val, OUT_val, average='weighted')
-                    print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
+                    # f1_val = f1_score(Y_val, OUT_val, average='weighted')
+                    precision_val, recall_val, f1_val, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
+                    print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}. precision (val) = {precision_val}. recall (val) = {recall_val}')
                     #
                     acc_test = accuracy_score(Y_test, OUT_test)
-                    f1_test = f1_score(Y_test, OUT_test, average='weighted')
-                    print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}')
+                    # f1_test = f1_score(Y_test, OUT_test, average='weighted')
+                    precision_test, recall_test, f1_test, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
+                    print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}. precision (test) = {precision_test}. recall (test) = {recall_test}')
+                    #
+                    cm_train = confusion_matrix(Y_train, OUT_train)
+                    cm_val   = confusion_matrix(Y_val, OUT_val)
+                    cm_test  = confusion_matrix(Y_test, OUT_test)
+                    #
+                    print("Confusion matrix (train):\n", cm_train)
+                    print("Confusion matrix (val):\n", cm_val)
+                    print("Confusion matrix (test):\n", cm_test)
+                    #
                     METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
-                #
-                if f1_val > best_val_score:
-                    best_val_score = f1_val
-                    best_model = MODEL
-                    print(f"New best model found with PCA: {pca_comp}, Kernel: {SVM_kernel}, C: {C}, gamma {gamma}, Val Mean UA: {best_val_score:.2f}")
-                #
-                idx_sim += 1
+                    #
+                    if f1_val > best_val_score:
+                        best_val_score = f1_val
+                        best_model = MODEL
+                        print(f"New best model found with PCA: {pca_comp}, Kernel: {SVM_kernel}, C: {C}, gamma {gamma}, Val Mean UA: {best_val_score:.2f}")
+                    #
+                    idx_sim += 1
     #
     # Save best model
     exp_name = 'svc'
@@ -87,7 +108,7 @@ if __name__ == "__main__":
     # Read the data
     X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
     X_train_split = np.concatenate((X_train_split, X_val_split, X_test_split), axis=0)
-    Y_train = np.concatenate((Y_train, Y_val), axis=0)
+    Y_train = np.concatenate((Y_train, Y_val, Y_test), axis=0)
     #
     # Shuffle data
     X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
