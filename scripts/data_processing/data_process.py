@@ -12,8 +12,9 @@ T2I = {
     # CHAT
     "aim": 0,
     "facebook_chat": 1,
-    "gmail": 2,
-    "hangouts_chat": 3,
+    # "gmail": 2,
+    "hangouts_chat": 2,
+    "skype_chat": 3,
     "icq": 4,
 
     # EMAIL
@@ -40,10 +41,14 @@ T2I = {
     # VIDEO CALL
     "facebook_video": 18,
     "skype_video": 19,
+    "hangouts_video": 20
 }
 I2T = {v: k for k, v in T2I.items()}
 
 
+# =========================
+# Main Processing Function
+# =========================
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pcap", required=True)
@@ -57,11 +62,18 @@ def main():
             os.path.join(args.pcap, f)
             for f in os.listdir(args.pcap)
             if f.endswith(".pcap")
-            # if f.endswith(".pcap") or f.endswith(".pcapng")
         ]
     else:
         pcap_files = [args.pcap]
     print(f"Found {len(pcap_files)} PCAP files to process.")
+
+    # Flows counter
+    total_flows = 0
+
+    # Sort files ascending by size
+    pcap_files.sort(key=lambda f: os.path.getsize(f))
+    # pcap_files = pcap_files[-4:]
+
     # Process each PCAP file
     for pcap_path in tqdm(pcap_files):
         # Get traffic type from filename
@@ -86,6 +98,7 @@ def main():
                                 args.flow_interval)
         rows = []
         for flow in flows:
+            # print(f"  Flow: {flow['flow_key']} | Duration: {flow['duration']} | Init Dir: {flow['init_dir']} | Packets: {flow['packet_count']} | Bytes: {flow['total_bytes']} | Protocol: {flow['protocol']}")
             feats = extract_features_from_flow(flow)
             feats["Label"] = traffic_type
             rows.append(feats)
@@ -97,8 +110,12 @@ def main():
         else:
             df.to_csv(args.output_csv, index=False)
 
+        # Increment flows count
+        total_flows += len(df)
         print(f"[OK] {len(df)} flows appended to {args.output_csv}")
-
+    
+    # Print toal flows count
+    print(f"Total flows processed: {total_flows}") 
 
 if __name__ == "__main__":
     main()
