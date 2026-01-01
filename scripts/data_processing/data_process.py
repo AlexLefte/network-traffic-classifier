@@ -52,7 +52,7 @@ I2T = {v: k for k, v in T2I.items()}
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pcap", required=True)
-    parser.add_argument("--flow_interval", type=float, required=True)
+    parser.add_argument("--flow_interval", default=None)
     parser.add_argument("--output_csv", required=True)
     args = parser.parse_args()
 
@@ -94,8 +94,12 @@ def main():
         )
         
         # Aggregate flows
+        if args.flow_interval is not None:
+            flow_interval = float(args.flow_interval)
+        else:
+            flow_interval = float('inf')
         flows = aggregate_flows(packets_generator, 
-                                args.flow_interval)
+                                flow_timeout=flow_interval)
         rows = []
         for flow in flows:
             # print(f"  Flow: {flow['flow_key']} | Duration: {flow['duration']} | Init Dir: {flow['init_dir']} | Packets: {flow['packet_count']} | Bytes: {flow['total_bytes']} | Protocol: {flow['protocol']}")
