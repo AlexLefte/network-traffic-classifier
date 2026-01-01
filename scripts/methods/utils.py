@@ -28,10 +28,12 @@ def read_csv(file_path, id_column='ID', test_size=0.2, random_state=42):
         'count': bin_counts,
         'percent (%)': bin_percent.round(2)
     }))
-    #
+    
     # Split features / labels
-    X = df.drop(columns=['Label', 'binary_label', 'flow_id'])
-    # X = df.drop(columns=['Label', 'binary_label'])
+    columns = ['Label', 'binary_label']
+    if 'flow_id' in df.columns:
+        columns.append('flow_id')
+    X = df.drop(columns=columns)
     y = df['binary_label']
     #
     # Stratified split
