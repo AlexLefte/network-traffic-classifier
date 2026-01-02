@@ -37,7 +37,7 @@ if __name__ == "__main__":
     best_val_score = -float('inf')
     #
     # Retrieve the csv paths
-    file_path = os.path.join(root_path, f"flows.csv")
+    file_path = os.path.join(root_path, file_path)
     #
     # Read and shffle the data
     X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
