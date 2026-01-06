@@ -67,7 +67,7 @@ if __name__ == '__main__':
     batch_size = 256
     num_epochs = 100
     learning_rate = 0.001
-    input_size = 56
+    input_size = 25
     #
     Nsim = len(hidden_layers)*len(dropouts)
     idx_sim = 0
@@ -82,12 +82,12 @@ if __name__ == '__main__':
             METRIX = []
             #
             # Define the tensors
-            X_train_tensor = torch.tensor(X_train_split, dtype=torch.float32).to(device)
-            Y_train_tensor = torch.tensor(Y_train, dtype=torch.long).to(device)
-            X_val_tensor   = torch.tensor(X_val_split, dtype=torch.float32).to(device)
-            Y_val_tensor   = torch.tensor(Y_val, dtype=torch.long).to(device)
-            X_test_tensor  = torch.tensor(X_test_split, dtype=torch.float32).to(device)
-            Y_test_tensor  = torch.tensor(Y_test, dtype=torch.long).to(device)
+            X_train_tensor = torch.tensor(np.array(X_train_split), dtype=torch.float32).to(device)
+            Y_train_tensor = torch.tensor(np.array(Y_train), dtype=torch.long).to(device)
+            X_val_tensor   = torch.tensor(np.array(X_val_split), dtype=torch.float32).to(device)
+            Y_val_tensor   = torch.tensor(np.array(Y_val), dtype=torch.long).to(device)
+            X_test_tensor  = torch.tensor(np.array(X_test_split), dtype=torch.float32).to(device)
+            Y_test_tensor  = torch.tensor(np.array(Y_test), dtype=torch.long).to(device)
             #
             # Create DataLoaders
             train_dataset = TensorDataset(X_train_tensor, Y_train_tensor)
@@ -162,7 +162,7 @@ if __name__ == '__main__':
             plt.legend()
             plt.grid(True)
             os.makedirs('plots', exist_ok=True)
-            output_plot_path = f"plots/{' '.join(map(str, hidden_sizes))}_split_{split_index}.png"  # Change to your desired path
+            output_plot_path = f"plots/{' '.join(map(str, hidden_sizes))}.png"  # Change to your desired path
             plt.savefig(output_plot_path, dpi=300, bbox_inches='tight')
             plt.close()
             #
