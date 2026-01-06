@@ -17,11 +17,9 @@ def read_csv(file_path, id_column='ID', test_size=0.2, random_state=42):
     }))
     #
     # --------- BINARY LABEL MAPPING ----------
-    labels_of_interest = [14, 15, 16, 17] # 14, 15, 16, 17
     df['binary_label'] = df['Label'].apply(lambda x: 1 if x in labels_of_interest else 0)
     #
     # --------- BINARY DISTRIBUTION ----------
-    # print("\n=== Binary class distribution ===")
     bin_counts = df['binary_label'].value_counts().sort_index()
     bin_percent = df['binary_label'].value_counts(normalize=True).sort_index() * 100
     print(pd.DataFrame({
@@ -30,9 +28,11 @@ def read_csv(file_path, id_column='ID', test_size=0.2, random_state=42):
     }))
     
     # Split features / labels
-    columns = ['Label', 'binary_label']
-    if 'flow_id' in df.columns:
-        columns.append('flow_id')
+    columns = []
+    to_be_removed = ['Label', 'binary_label', 'flow_id', 'flow_id_init', 'file']
+    for c in to_be_removed:
+        if c in df.columns:
+            columns.append(c)
     X = df.drop(columns=columns)
     y = df['binary_label']
     #
