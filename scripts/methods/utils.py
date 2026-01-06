@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 
-def read_csv(file_path, id_column='ID', test_size=0.2, random_state=42):
+def read_csv(file_path, labels_of_interest=[16], random_state=42):
     #
     # Load CSV
     df = pd.read_csv(file_path)

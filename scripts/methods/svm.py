@@ -10,16 +10,18 @@ from sklearn.utils              import shuffle
 from sklearn.metrics            import accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support
 from utils                      import read_csv
 from sklearn.utils.class_weight import compute_sample_weight
+from imblearn.over_sampling import SMOTE
 #
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_file", type=str, required=True)
+    parser.add_argument("--smote", type=int, default=None)
     args = parser.parse_args()
-    #
+    
     # Datasets
     root_path = ""
     file_path = args.csv_file
-    #
+    
     # Hyperparameters
     PCA_components = ['no_pca', 5, 10, 15, 20, 25]
     SVM_kernels = ['rbf']
@@ -40,8 +42,17 @@ if __name__ == "__main__":
     file_path = os.path.join(root_path, file_path)
     #
     # Read and shffle the data
-    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path, labels_of_interest=[16])
     X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
+
+    print(f'Positives before SMOTE: {np.sum(Y_train)}')
+
+    # Apply SMOTE
+    if args.smote is not None:
+      smote = SMOTE(sampling_strategy={1: args.smote}, random_state=42)
+      X_train_split, Y_train = smote.fit_resample(X_train_split, Y_train)
+      print(f'Positives after SMOTE: {np.sum(Y_train)}')
+
     #
     weights = compute_sample_weight(class_weight='balanced', y=Y_train)
     print(f"Weights: {np.unique(weights)}")
@@ -58,6 +69,7 @@ if __name__ == "__main__":
                         X_train_split = pca.fit_transform(X_train_split)
                         X_val_split = pca.transform(X_val_split)
                         X_test_split = pca.transform(X_test_split)
+                        print(X_train_split.shape)
                     #
                     MODEL = SVC(C=C, kernel=SVM_kernel, tol=1.0)
                     MODEL.fit(X_train_split, Y_train, sample_weight=weights)

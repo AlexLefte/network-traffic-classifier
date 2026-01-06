@@ -10,11 +10,12 @@ from sklearn.utils              import shuffle
 from sklearn.metrics            import accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support
 from utils                      import read_csv
 from sklearn.utils.class_weight import compute_sample_weight
-#
-#
+from imblearn.over_sampling import SMOTE
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_file", type=str, required=True)
+    parser.add_argument("--smote", type=int, default=None)
     args = parser.parse_args()
     #
     # Datasets
@@ -38,8 +39,15 @@ if __name__ == '__main__':
     best_val_score = -float('inf')
     #
     # Read and shuffle the data
-    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path, labels_of_interest=[16])
     X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
+
+    # Apply SMOTE
+    if args.smote is not None:
+      smote = SMOTE(sampling_strategy={1: args.smote}, random_state=42)
+      X_train_split, Y_train = smote.fit_resample(X_train_split, Y_train)
+      print(f'Positives after SMOTE: {np.sum(Y_train)}')
+
     #
     weights = compute_sample_weight(class_weight='balanced', y=Y_train)
     # print(f"Weights: {np.unique(weights)}")
@@ -63,18 +71,15 @@ if __name__ == '__main__':
                 #
                 # Train metrics
                 acc_train = accuracy_score(Y_train, OUT_train)
-                # f1_train = f1_score(Y_train, OUT_train, average='weighted')
                 precision_train, recall_train, f1_train, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
                 print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}. precision (train) = {precision_train}. recall (train) = {recall_train}')
                 #
                 acc_val = accuracy_score(Y_val, OUT_val)
-                # f1_val = f1_score(Y_val, OUT_val, average='weighted')
-                precision_val, recall_val, f1_val, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
+                precision_val, recall_val, f1_val, _ = precision_recall_fscore_support(y_true=Y_val, y_pred=OUT_val, average='weighted')
                 print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}. precision (val) = {precision_val}. recall (val) = {recall_val}')
                 #
                 acc_test = accuracy_score(Y_test, OUT_test)
-                # f1_test = f1_score(Y_test, OUT_test, average='weighted')
-                precision_test, recall_test, f1_test, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
+                precision_test, recall_test, f1_test, _ = precision_recall_fscore_support(y_true=Y_test, y_pred=OUT_test, average='weighted')
                 print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}. precision (test) = {precision_test}. recall (test) = {recall_test}')
                 #
                 cm_train = confusion_matrix(Y_train, OUT_train)
