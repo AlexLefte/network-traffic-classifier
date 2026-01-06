@@ -7,7 +7,7 @@ import hashlib
 # Basic statistical functions
 def compute_stats(arr):
     if len(arr) == 0:
-        return np.nan, np.nan, np.nan, np.nan, np.nan
+        return 0, 0, -1, -1, 0
     return (
         np.mean(arr),
         np.median(arr),
@@ -22,7 +22,7 @@ def compute_iat(packets):
             return np.diff(ts) if len(ts) > 1 else np.array([]) 
 
 # Main extraction function
-def extract_features_from_flow(flow) -> dict:
+def extract_features_from_flow(flow, file=None) -> dict:
     features = {}
     pkts = flow.get("packets", [])
     
@@ -99,6 +99,8 @@ def extract_features_from_flow(flow) -> dict:
     flow_id_hash = int(hashlib.sha1(flow_id_string.encode('utf-8')).hexdigest(), 16) % (10**16)
 
     features = {
+            'flow_id_init': flow_id_string,
+            'file': file,
             'flow_id': flow_id_hash,
             'duration': flow['duration'],
             'protocol': flow['protocol'],
@@ -120,27 +122,27 @@ def extract_features_from_flow(flow) -> dict:
             # "up_down_pkt_ratio": up_down_pkt_ratio,
 
             # FIAT
-            "fiat_total": fiat_total,
-            "fiat_mean": fiat_mean,
-            "fiat_median": fiat_median,
-            "fiat_min": fiat_min,
-            "fiat_max": fiat_max,
-            "fiat_std": fiat_std,
+            "total_fiat": fiat_total,
+            "mean_fiat": fiat_mean,
+            "median_fiat": fiat_median,
+            "min_fiat": fiat_min,
+            "max_fiat": fiat_max,
+            "std_fiat": fiat_std,
 
             # BIAT
-            "biat_total": biat_total,
-            "biat_mean": biat_mean,
-            "biat_median": biat_median,
-            "biat_min": biat_min,
-            "biat_max": biat_max,
-            "biat_std": biat_std,
+            "total_biat": biat_total,
+            "mean_biat": biat_mean,
+            "median_biat": biat_median,
+            "min_biat": biat_min,
+            "max_biat": biat_max,
+            "std_biat": biat_std,
 
             # Flow IAT
-            "flowiat_mean": flowiat_mean,
-            "flowiat_median": flowiat_median,
-            "flowiat_min": flowiat_min,
-            "flowiat_max": flowiat_max,
-            "flowiat_std": flowiat_std,
+            "mean_flowiat": flowiat_mean,
+            "median_flowiat": flowiat_median,
+            "min_flowiat": flowiat_min,
+            "max_flowiat": flowiat_max,
+            "std_flowiat": flowiat_std,
 
             # Frequency-based
             "flowiat_skew": flowiat_skew,

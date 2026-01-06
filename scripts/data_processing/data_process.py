@@ -12,7 +12,7 @@ T2I = {
     # CHAT
     "aim": 0,
     "facebook_chat": 1,
-    # "gmail": 2,
+    "gmail": 21,
     "hangouts_chat": 2,
     "skype_chat": 3,
     "icq": 4,
@@ -103,7 +103,7 @@ def main():
         rows = []
         for flow in flows:
             # print(f"  Flow: {flow['flow_key']} | Duration: {flow['duration']} | Init Dir: {flow['init_dir']} | Packets: {flow['packet_count']} | Bytes: {flow['total_bytes']} | Protocol: {flow['protocol']}")
-            feats = extract_features_from_flow(flow)
+            feats = extract_features_from_flow(flow, file=pcap_name)
             feats["Label"] = traffic_type
             rows.append(feats)
 
