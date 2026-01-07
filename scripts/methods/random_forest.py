@@ -4,11 +4,11 @@ import os
 import pickle
 import argparse
 import matplotlib.pyplot as plt
-#
+
 from sklearn.ensemble           import RandomForestClassifier as RF
 from sklearn.utils              import shuffle
-from sklearn.metrics            import accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support
-from utils                      import read_csv
+from sklearn.metrics            import confusion_matrix
+from utils                      import read_csv, compute_metrics
 from sklearn.utils.class_weight import compute_sample_weight
 from imblearn.over_sampling import SMOTE
 
@@ -52,14 +52,13 @@ if __name__ == '__main__':
     weights = compute_sample_weight(class_weight='balanced', y=Y_train)
     # print(f"Weights: {np.unique(weights)}")
     #
+    METRIX = []
     for es in estimators:
       for mss in min_samples_split:
         for md in max_depth:
           for msl in min_samples_leaf:
             for ms in max_samples:
               for mf in max_features:
-                METRIX = []
-                #
                 # Create the model
                 MODEL = RF(n_estimators=es, min_samples_split=mss, max_depth=md,
                     min_samples_leaf=msl, max_samples=ms, max_features=mf)
@@ -68,20 +67,13 @@ if __name__ == '__main__':
                 OUT_train = MODEL.predict(X_train_split)
                 OUT_val   = MODEL.predict(X_val_split)
                 OUT_test  = MODEL.predict(X_test_split)
-                #
-                # Train metrics
-                acc_train = accuracy_score(Y_train, OUT_train)
-                precision_train, recall_train, f1_train, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
-                print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}. precision (train) = {precision_train}. recall (train) = {recall_train}')
-                #
-                acc_val = accuracy_score(Y_val, OUT_val)
-                precision_val, recall_val, f1_val, _ = precision_recall_fscore_support(y_true=Y_val, y_pred=OUT_val, average='weighted')
-                print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}. precision (val) = {precision_val}. recall (val) = {recall_val}')
-                #
-                acc_test = accuracy_score(Y_test, OUT_test)
-                precision_test, recall_test, f1_test, _ = precision_recall_fscore_support(y_true=Y_test, y_pred=OUT_test, average='weighted')
-                print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}. precision (test) = {precision_test}. recall (test) = {recall_test}')
-                #
+                
+                # Metrics
+                acc_train, f1_train, *_ = compute_metrics(Y_train, OUT_train, split='Train')
+                acc_val, f1_val, *_ = compute_metrics(Y_val, OUT_val, split='Val')
+                acc_test, f1_test, *_ = compute_metrics(Y_test, OUT_test, split='Test')
+                
+                # CM
                 cm_train = confusion_matrix(Y_train, OUT_train)
                 cm_val   = confusion_matrix(Y_val, OUT_val)
                 cm_test  = confusion_matrix(Y_test, OUT_test)
@@ -90,17 +82,23 @@ if __name__ == '__main__':
                 print("Confusion matrix (val):\n", cm_val)
                 print("Confusion matrix (test):\n", cm_test)
                 #
-                METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
+                METRIX.append([acc_train, f1_train, acc_val, f1_val, acc_test, f1_test])
                 #
                 # Update best model if current is better
                 if f1_val > best_val_score:
                     best_val_score = f1_val
+                    best_idx = idx_sim
                     best_model = MODEL
                     print(f"New best model found with: {es} estimators, {mss} minimum sample split",
                       f"{md} max depth, {msl} minimum sample per leaf, {ms} max sample count/percentage, "
                       f"{mf} max features. Val Mean UA: {best_val_score:.2f}")
 
                 idx_sim += 1
+    
+    # Best scores:
+    print("Best scores: ")
+    print(METRIX[best_idx])
+
     #
     sim_list_idx = range(0, Nsim)
     sim_list_estimators = []

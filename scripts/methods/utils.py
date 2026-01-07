@@ -1,6 +1,25 @@
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support
+
+
+def compute_metrics(Y, OUT, split, verbose=False):
+    acc = accuracy_score(Y, OUT)
+    f1, prec, rec = None, None, None
+    precision_train, recall_train, f1_train, support_train = precision_recall_fscore_support(Y, OUT, average=None)
+    
+    print(f"{split} metrics per class:")
+    for i, (p, r, f, s) in enumerate(zip(precision_train, recall_train, f1_train, support_train)):
+        print(f"Class {i}: precision={p:.3f}, recall={r:.3f}, f1={f:.3f}, support={s}")
+
+        if i == 1:
+            f1 = f
+            prec = p
+            rec = r
+    print(f"Overall accuracy: {acc:.3f}\n")
+    return acc, f1, prec, rec 
+
 
 def read_csv(file_path, labels_of_interest=[16], random_state=42):
     #
@@ -57,7 +76,7 @@ def read_csv(file_path, labels_of_interest=[16], random_state=42):
             'count': counts,
             'percent (%)': perc.round(2)
         }))
-    #
+
     # Min-Max normalization on train
     scaler = MinMaxScaler()
     X_train_scaled = pd.DataFrame(
@@ -74,7 +93,6 @@ def read_csv(file_path, labels_of_interest=[16], random_state=42):
         scaler.transform(X_test),
         columns=X_test.columns
     )
-    #
     # Replace invalid data with -1
     X_train_scaled = X_train_scaled.fillna(-1)
     X_val_scaled   = X_val_scaled.fillna(-1)

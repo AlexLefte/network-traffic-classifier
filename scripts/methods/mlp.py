@@ -10,7 +10,7 @@ import torch.nn       as nn
 import torch.optim    as optim
 from torch.utils.data import DataLoader, TensorDataset
 #
-from utils                   import read_csv
+from utils                   import read_csv, compute_metrics
 from sklearn.utils           import shuffle
 from sklearn.metrics         import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics         import accuracy_score, f1_score
@@ -67,14 +67,14 @@ if __name__ == '__main__':
     batch_size = 256
     num_epochs = 100
     learning_rate = 0.001
-    input_size = 25
+    input_size = 29
     #
     Nsim = len(hidden_layers)*len(dropouts)
     idx_sim = 0
     METRIX_ = np.zeros((Nsim, 4))
     #
     # Read and shuffle data
-    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path)
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path, labels_of_interest=[14, 15, 16, 17])
     X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
     #
     for hidden_sizes in hidden_layers:
@@ -205,18 +205,16 @@ if __name__ == '__main__':
                 plot_confusion_matrix(val_targets, val_predictions, "Confusion Matrix - Validation")
                 plot_confusion_matrix(test_targets, test_predictions, "Confusion Matrix - Test")
             #    
-            acc_train = accuracy_score(train_targets, train_predictions)
-            f1_train = f1_score(train_targets, train_predictions, average='weighted')
+            # Metrics
+            acc_train, f1_train, *_ = compute_metrics(Y_train, train_predictions, split='Train')
             params_string = '_'.join(list(map(str, [hidden_sizes] + [dropout])))
             print(f'\n{params_string}')
             print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}')
             #
-            acc_val = accuracy_score(val_targets, val_predictions)
-            f1_val = f1_score(val_targets, val_predictions, average='weighted')
+            acc_val, f1_val, *_ = compute_metrics(Y_val, val_predictions, split='Val')
             print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}')
             #
-            acc_test = accuracy_score(test_targets, test_predictions)
-            f1_test = f1_score(test_targets, test_predictions, average='weighted')
+            acc_test, f1_test, *_ = compute_metrics(Y_test, test_predictions, split='Test')
             print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}')
             METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
             #

@@ -7,11 +7,12 @@ import pandas as pd
 from sklearn.svm                import SVC
 from sklearn.decomposition      import PCA
 from sklearn.utils              import shuffle
-from sklearn.metrics            import accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support
-from utils                      import read_csv
+from sklearn.metrics            import confusion_matrix
+from utils                      import read_csv, compute_metrics
 from sklearn.utils.class_weight import compute_sample_weight
 from imblearn.over_sampling import SMOTE
 #
+            
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_file", type=str, required=True)
@@ -78,19 +79,11 @@ if __name__ == "__main__":
                     OUT_val   = MODEL.predict(X_val_split)
                     OUT_test  = MODEL.predict(X_test_split)
                     #
-                    # Train metrics
-                    acc_train = accuracy_score(Y_train, OUT_train)
-                    precision_train, recall_train, f1_train, _ = precision_recall_fscore_support(y_true=Y_train, y_pred=OUT_train, average='weighted')
-                    print(f'acc (train) = {acc_train}. f1 (train) = {f1_train}. precision (train) = {precision_train}. recall (train) = {recall_train}')
-                    #
-                    acc_val = accuracy_score(Y_val, OUT_val)
-                    precision_val, recall_val, f1_val, _ = precision_recall_fscore_support(y_true=Y_val, y_pred=OUT_val, average='weighted')
-                    print(f'acc (val) = {acc_val}. f1 (val) = {f1_val}. precision (val) = {precision_val}. recall (val) = {recall_val}')
-                    #
-                    acc_test = accuracy_score(Y_test, OUT_test)
-                    precision_test, recall_test, f1_test, _ = precision_recall_fscore_support(y_true=Y_test, y_pred=OUT_test, average='weighted')
-                    print(f'acc (test) = {acc_test}. f1 (test) = {f1_test}. precision (test) = {precision_test}. recall (test) = {recall_test}')
-                    #
+                    # Metrics
+                    acc_train, f1_train, *_ = compute_metrics(Y_train, OUT_train, split='Train')
+                    acc_val, f1_val, *_ = compute_metrics(Y_val, OUT_val, split='Val')
+                    acc_test, f1_test, *_ = compute_metrics(Y_test, OUT_test, split='Test')
+
                     cm_train = confusion_matrix(Y_train, OUT_train)
                     cm_val   = confusion_matrix(Y_val, OUT_val)
                     cm_test  = confusion_matrix(Y_test, OUT_test)
