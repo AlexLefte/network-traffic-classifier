@@ -8,15 +8,15 @@ from sklearn.svm                import SVC
 from sklearn.decomposition      import PCA
 from sklearn.utils              import shuffle
 from sklearn.metrics            import confusion_matrix
-from utils                      import read_csv, compute_metrics
+from utils                      import read_csv, read_csv_multiclass, compute_metrics
 from sklearn.utils.class_weight import compute_sample_weight
-from imblearn.over_sampling import SMOTE
+from imblearn.combine import SMOTEENN
 #
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv_file", type=str, required=True)
-    parser.add_argument("--smote", type=int, default=None)
+    parser.add_argument("--smote", action='store_true')
     args = parser.parse_args()
     
     # Datasets
@@ -31,26 +31,27 @@ if __name__ == "__main__":
     #
     # Number of simulations and metrix array definition
     Nsim = len(PCA_components) * len(SVM_kernels) * len(Cs) * len(gammas)
-    #
     idx_sim = 0
-    METRIX_ = np.zeros((Nsim, 4))
-    #
+    
     # Save best model for the current split
     best_model = None
     best_val_score = -float('inf')
-    #
+    
     # Retrieve the csv paths
     file_path = os.path.join(root_path, file_path)
-    #
+    
     # Read and shffle the data
-    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path, labels_of_interest=[16])
+    class_of_interest = [14, 15, 16, 17]
+    
+    # class_of_interest = ['STREAMING']
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path, labels_of_interest=class_of_interest)
     X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
 
     print(f'Positives before SMOTE: {np.sum(Y_train)}')
 
-    # Apply SMOTE
+    # Apply SMOTEENN
     if args.smote is not None:
-      smote = SMOTE(sampling_strategy={1: args.smote}, random_state=42)
+      smote = SMOTEENN(sampling_strategy='auto', random_state=42)
       X_train_split, Y_train = smote.fit_resample(X_train_split, Y_train)
       print(f'Positives after SMOTE: {np.sum(Y_train)}')
 
@@ -58,11 +59,12 @@ if __name__ == "__main__":
     weights = compute_sample_weight(class_weight='balanced', y=Y_train)
     print(f"Weights: {np.unique(weights)}")
     #
+    METRIX = []
     for pca_comp in PCA_components:
         for SVM_kernel in SVM_kernels:
             for C in Cs:
                 for gamma in gammas:
-                    METRIX = []
+                    
                     #
                     # Perform PCA for feature reduction
                     if pca_comp != 'no_pca':
@@ -80,9 +82,9 @@ if __name__ == "__main__":
                     OUT_test  = MODEL.predict(X_test_split)
                     #
                     # Metrics
-                    acc_train, f1_train, *_ = compute_metrics(Y_train, OUT_train, split='Train')
-                    acc_val, f1_val, *_ = compute_metrics(Y_val, OUT_val, split='Val')
-                    acc_test, f1_test, *_ = compute_metrics(Y_test, OUT_test, split='Test')
+                    acc_train, f1_train, prec_train, rec_train = compute_metrics(Y_train, OUT_train, split='Train')
+                    acc_val, f1_val, prec_val, rec_val = compute_metrics(Y_val, OUT_val, split='Val')
+                    acc_test, f1_test, prec_test, rec_test = compute_metrics(Y_test, OUT_test, split='Test')
 
                     cm_train = confusion_matrix(Y_train, OUT_train)
                     cm_val   = confusion_matrix(Y_val, OUT_val)
@@ -92,26 +94,24 @@ if __name__ == "__main__":
                     print("Confusion matrix (val):\n", cm_val)
                     print("Confusion matrix (test):\n", cm_test)
                     #
-                    METRIX += [acc_train, f1_train, acc_val, f1_val, acc_test, f1_test]
+                    METRIX.append([acc_train, f1_train, prec_train, rec_train,
+                               acc_val, f1_val, prec_val, rec_val,
+                               acc_test, f1_test, prec_test, rec_test])
                     #
                     if f1_val > best_val_score:
                         best_val_score = f1_val
                         best_model = MODEL
+                        best_idx = idx_sim
                         print(f"New best model found with PCA: {pca_comp}, Kernel: {SVM_kernel}, C: {C}, gamma {gamma}, Val Mean UA: {best_val_score:.2f}")
                     #
                     idx_sim += 1
-    #
-    # Save best model
-    exp_name = 'svc'
-    model_path = os.path.join(root_path, f"models/SVC/{exp_name}")
-    os.makedirs(model_path, exist_ok=True)
-    model_path = os.path.join(model_path, f"best_svc_configs.pkl")
     
-    # Train the Model on the entire dataset and save
-    best_model.fit(X_train_split, Y_train)
-    with open(model_path, "wb") as f:
-        pickle.dump(best_model, f)
-    #
+    # Best scores:
+    print("Best scores: ")
+    print(METRIX[best_idx])
+    METRIX = np.array(METRIX)
+
+    # Create csv
     sim_list_idx = range(0, Nsim)
     sim_list_pca = []
     sim_list_SVM_kernels = []
@@ -126,19 +126,36 @@ if __name__ == "__main__":
                     sim_list_Cs.append(C)
                     sim_list_gammas.append(gamma)
     #
-    df_dict = { k:v for (k, v) in zip(['SIM', 'PCA_comp', 'Kernel', 'C',
-                                        'Acc_train [%]', 'F1_train [%]',
-                                        'Acc_val [%]', 'F1_val [%]', 'g'],
-                                        [sim_list_idx, sim_list_pca, sim_list_SVM_kernels,
-                                        sim_list_Cs,
-                                        METRIX_[:,0], METRIX_[:,1],
-                                        METRIX_[:,2], METRIX_[:,3], sim_list_gammas])}
+    df_dict = pd.DataFrame({
+        'SIM': sim_list_idx,
+        'PCA_components': sim_list_pca,
+        'kernel': sim_list_SVM_kernels,
+        'C': sim_list_Cs,
+        'gamma': sim_list_gammas,
+
+        'acc_train': METRIX[:, 0],
+        'f1_train':  METRIX[:, 1],
+        'prec_train': METRIX[:, 2],
+        'rec_train':  METRIX[:, 3],
+
+        'acc_val': METRIX[:, 4],
+        'f1_val':  METRIX[:, 5],
+        'prec_val': METRIX[:, 6],
+        'rec_val':  METRIX[:, 7],
+
+        'acc_test': METRIX[:, 8],
+        'f1_test':  METRIX[:, 9],
+        'prec_test': METRIX[:,10],
+        'rec_test':  METRIX[:,11],
+    })
+
     #
     df = pd.DataFrame(df_dict)
     csv_path = os.path.join(root_path, 'results')
     os.makedirs(csv_path, exist_ok=True)
-    results_path = os.path.join(csv_path, f'SVC_configs.csv')
-    #
+
+    results_path = os.path.join(csv_path, 'SVC_configs.csv')
+
     if os.path.exists(results_path):
         df.to_csv(results_path, mode='a', header=False, index=False)
     else:
