@@ -80,7 +80,7 @@ def plot_tsne_by_protocol(X, protocols, perplexity=30, n_iter=1000, random_state
     print(f"\nRunning t-SNE with {X.shape[0]} samples and {X.shape[1]} features...")
     print(f"Parameters: perplexity={perplexity}, n_iter={n_iter}")
     
-    tsne = TSNE(n_components=2, perplexity=perplexity, n_iter=n_iter, 
+    tsne = TSNE(n_components=2, perplexity=perplexity,
                 random_state=random_state, verbose=1)
     X_tsne = tsne.fit_transform(X_scaled)
     
@@ -120,7 +120,7 @@ def plot_tsne_by_label(X, labels, perplexity=30, n_iter=1000, random_state=42):
     print(f"\nRunning t-SNE with {X.shape[0]} samples and {X.shape[1]} features...")
     print(f"Parameters: perplexity={perplexity}, n_iter={n_iter}")
     
-    tsne = TSNE(n_components=2, perplexity=perplexity, n_iter=n_iter, 
+    tsne = TSNE(n_components=2, perplexity=perplexity,
                 random_state=random_state, verbose=1)
     X_tsne = tsne.fit_transform(X_scaled)
     
@@ -176,7 +176,7 @@ def plot_both_analyses(X, protocols, labels, perplexity=30, n_iter=1000, random_
     print(f"\nRunning t-SNE with {X.shape[0]} samples and {X.shape[1]} features...")
     print(f"Parameters: perplexity={perplexity}, n_iter={n_iter}")
     
-    tsne = TSNE(n_components=2, perplexity=perplexity, n_iter=n_iter, 
+    tsne = TSNE(n_components=2, perplexity=perplexity,
                 random_state=random_state, verbose=1)
     X_tsne = tsne.fit_transform(X_scaled)
     
