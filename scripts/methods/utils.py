@@ -1,5 +1,6 @@
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support
 import numpy as np
@@ -22,7 +23,9 @@ def compute_metrics(Y, OUT, split, verbose=False):
     return acc, f1, prec, rec 
 
 
-def read_csv(file_path, labels_of_interest=[14,15,16,17], random_state=42):
+def read_csv(file_path, 
+             labels_of_interest=[14,15,16,17], 
+             random_state=42):
     #
     # Load CSV
     df = pd.read_csv(file_path)
@@ -35,73 +38,113 @@ def read_csv(file_path, labels_of_interest=[14,15,16,17], random_state=42):
         'count': class_counts,
         'percent (%)': class_percent.round(2)
     }))
-    #
-    # --------- BINARY LABEL MAPPING ----------
-    df['binary_label'] = df['Label'].apply(lambda x: 1 if x in labels_of_interest else 0)
-    #
-    # --------- BINARY DISTRIBUTION ----------
-    bin_counts = df['binary_label'].value_counts().sort_index()
-    bin_percent = df['binary_label'].value_counts(normalize=True).sort_index() * 100
-    print(pd.DataFrame({
-        'count': bin_counts,
-        'percent (%)': bin_percent.round(2)
-    }))
-    
-    # Split features / labels
-    columns = []
-    to_be_removed = ['Label', 'binary_label', 'flow_id', 'flow_id_init', 'file']
-    for c in to_be_removed:
-        if c in df.columns:
-            columns.append(c)
-    X = df.drop(columns=columns)
-    y = df['binary_label']
-    #
-    # Stratified split
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        X, y, test_size=0.3, random_state=random_state, stratify=y
-    )
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.5, random_state=random_state, stratify=y_temp
-    )
-    #
-    # --------- SPLIT DISTRIBUTIONS ----------
-    print("\n=== Split distributions (binary) ===")
-    for name, labels in zip(
-        ['Train', 'Val', 'Test'],
-        [y_train, y_val, y_test]
-    ):
-        counts = labels.value_counts().sort_index()
-        perc = labels.value_counts(normalize=True).sort_index() * 100
-        print(f"\n{name}:")
-        print(pd.DataFrame({
-            'count': counts,
-            'percent (%)': perc.round(2)
-        }))
 
-    # Min-Max normalization on train
+    # --------- LIMIT FLOWS PER ORIGINAL CLASS ----------
+    # MAX_FLOWS_PER_CLASS = 1000
+    # df = (
+    #     df
+    #     .groupby('Label', group_keys=False)
+    #     .apply(lambda x: x.sample(
+    #         n=min(len(x), MAX_FLOWS_PER_CLASS),
+    #         random_state=random_state
+    #     ))
+    #     .reset_index(drop=True)
+    # )
+
+    # StratifiedGroupKFold
+    sgkf = StratifiedGroupKFold(
+        n_splits=10, shuffle=True, random_state=random_state
+    )
+
+    X_idx = df.index.values
+    y_orig = df['Label'].values         
+    groups = df['flow_id'].values
+
+    train_idx, temp_idx = next(
+        sgkf.split(X_idx, y_orig, groups)
+    )
+    df_train = df.iloc[train_idx]
+    df_temp  = df.iloc[temp_idx]
+
+    sgkf_2 = StratifiedGroupKFold(
+        n_splits=2, shuffle=True, random_state=random_state
+    )
+
+    X_temp_idx = df_temp.index.values
+    y_temp_orig = df_temp['Label'].values
+    g_temp = df_temp['flow_id'].values
+
+    val_idx, test_idx = next(
+        sgkf_2.split(X_temp_idx, y_temp_orig, g_temp)
+    )
+
+    df_val  = df_temp.iloc[val_idx]
+    df_test = df_temp.iloc[test_idx]
+
+    def check_split(name, d):
+        print(f"\n{name} original labels:")
+        print(d['Label'].value_counts(normalize=True).sort_index())
+        print(f"unique flows: {d['flow_id'].nunique()}")
+    check_split("Train", df_train)
+    check_split("Val", df_val)
+    check_split("Test", df_test)
+
+    # safety: zero leakage
+    assert set(df_train.flow_id).isdisjoint(df_val.flow_id)
+    assert set(df_train.flow_id).isdisjoint(df_test.flow_id)
+    assert set(df_val.flow_id).isdisjoint(df_test.flow_id)
+
+    # --------------------------------------------------
+    # BINARY LABEL MAPPING (AFTER SPLIT)
+    # --------------------------------------------------
+    for d in [df_train, df_val, df_test]:
+        d['binary_label'] = d['Label'].isin(labels_of_interest).astype(int)
+
+    print("\n=== Binary distribution AFTER split ===")
+    for name, d in zip(
+        ['Train', 'Val', 'Test'],
+        [df_train, df_val, df_test]
+    ):
+        print(f"\n{name}")
+        print(d['binary_label'].value_counts(normalize=True))
+
+    # --------------------------------------------------
+    # FEATURES
+    # --------------------------------------------------
+    drop_cols = ['Label', 'binary_label', 'flow_id', 'flow_id_init', 'file']
+    drop_cols = [c for c in drop_cols if c in df_train.columns]
+
+    X_train = df_train.drop(columns=drop_cols)
+    X_val   = df_val.drop(columns=drop_cols)
+    X_test  = df_test.drop(columns=drop_cols)
+
+    y_train = df_train['binary_label']
+    y_val   = df_val['binary_label']
+    y_test  = df_test['binary_label']
+
+    # --------------------------------------------------
+    # SCALING (train only)
+    # --------------------------------------------------
     scaler = MinMaxScaler()
-    X_train_scaled = pd.DataFrame(
+
+    X_train = pd.DataFrame(
         scaler.fit_transform(X_train),
         columns=X_train.columns
     )
-    #
-    # Apply transform on val and test
-    X_val_scaled = pd.DataFrame(
+    X_val = pd.DataFrame(
         scaler.transform(X_val),
         columns=X_val.columns
     )
-    X_test_scaled = pd.DataFrame(
+    X_test = pd.DataFrame(
         scaler.transform(X_test),
         columns=X_test.columns
     )
-    # Replace invalid data with -1
-    X_train_scaled = X_train_scaled.fillna(-1)
-    X_val_scaled   = X_val_scaled.fillna(-1)
-    X_test_scaled  = X_test_scaled.fillna(-1)
-    #
-    # print("\nDone reading csv\n")
-    #
-    return X_train_scaled, y_train, X_val_scaled, y_val, X_test_scaled, y_test
+
+    X_train = X_train.fillna(-1)
+    X_val   = X_val.fillna(-1)
+    X_test  = X_test.fillna(-1)
+
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
 
 def read_csv_multiclass(file_path, random_state=42):
