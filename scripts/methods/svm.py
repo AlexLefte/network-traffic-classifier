@@ -8,7 +8,7 @@ from sklearn.svm                import SVC
 from sklearn.decomposition      import PCA
 from sklearn.utils              import shuffle
 from sklearn.metrics            import confusion_matrix
-from utils                      import read_csv, read_csv_multiclass, compute_metrics
+from utils                      import read_csv, compute_metrics, read_csv_multiclass, read_arff_multiclass
 from sklearn.utils.class_weight import compute_sample_weight
 from imblearn.combine import SMOTEENN
 #
@@ -24,9 +24,9 @@ if __name__ == "__main__":
     file_path = args.csv_file
     
     # Hyperparameters
-    PCA_components = ['no_pca', 5, 10, 15, 20, 25]
+    PCA_components = ['no_pca', 0.95]
     SVM_kernels = ['rbf']
-    Cs = [20, 10, 1, 5e-1, 1e-1]
+    Cs = [100, 50, 20, 10, 1, 0.1, 0.01, 0.001]
     gammas = ['scale']
     #
     # Number of simulations and metrix array definition
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # class_of_interest = ['STREAMING']
     X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(file_path, labels_of_interest=class_of_interest)
     X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)
-
+    # print("Class weight dict:", class_weight_dict)
     print(f'Positives before SMOTE: {np.sum(Y_train)}')
 
     # Apply SMOTEENN

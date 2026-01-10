@@ -26,10 +26,9 @@ def compute_metrics(Y, OUT, split, verbose=False):
 def read_csv(file_path, 
              labels_of_interest=[14,15,16,17], 
              random_state=42):
-    #
     # Load CSV
     df = pd.read_csv(file_path)
-    #
+    
     # --------- ORIGINAL LABEL DISTRIBUTION ----------
     print("\n=== Original class distribution ===")
     class_counts = df['Label'].value_counts().sort_index()
@@ -38,95 +37,169 @@ def read_csv(file_path,
         'count': class_counts,
         'percent (%)': class_percent.round(2)
     }))
-
-    # --------- LIMIT FLOWS PER ORIGINAL CLASS ----------
-    # MAX_FLOWS_PER_CLASS = 1000
-    # df = (
-    #     df
-    #     .groupby('Label', group_keys=False)
-    #     .apply(lambda x: x.sample(
-    #         n=min(len(x), MAX_FLOWS_PER_CLASS),
-    #         random_state=random_state
-    #     ))
-    #     .reset_index(drop=True)
-    # )
-
-    # StratifiedGroupKFold
-    sgkf = StratifiedGroupKFold(
+    
+    # --------------------------------------------------
+    # CREATE BINARY LABEL *BEFORE* SPLITTING
+    # --------------------------------------------------
+    df['binary_label'] = df['Label'].isin(labels_of_interest).astype(int)
+    
+    print("\n=== Binary distribution BEFORE split ===")
+    print(df['binary_label'].value_counts(normalize=True))
+    
+    # --------------------------------------------------
+    # CHECK: Do flows have mixed labels?
+    # --------------------------------------------------
+    flow_label_counts = df.groupby('flow_id')['binary_label'].nunique()
+    mixed_flows = flow_label_counts[flow_label_counts > 1]
+    
+    if len(mixed_flows) > 0:
+        print(f"\nWARNING: {len(mixed_flows)} flows have mixed binary labels!")
+        print("These flows will be assigned to class 1 (minority) to be conservative")
+        
+        # Assign entire flow to class 1 if it has any class 1 samples
+        mixed_flow_ids = mixed_flows.index
+        df.loc[df['flow_id'].isin(mixed_flow_ids), 'binary_label'] = 1
+        
+        print("\nAfter reassignment:")
+        print(df['binary_label'].value_counts(normalize=True))
+    
+    # --------------------------------------------------
+    # SPLIT AT FLOW LEVEL (not packet level)
+    # --------------------------------------------------
+    # Get unique flows with their majority binary label
+    flow_labels = df.groupby('flow_id')['binary_label'].first().reset_index()
+    flow_labels.columns = ['flow_id', 'flow_binary_label']
+    
+    # Also get original labels for stratification
+    flow_orig_labels = df.groupby('flow_id')['Label'].first().reset_index()
+    flow_labels = flow_labels.merge(flow_orig_labels, on='flow_id')
+    
+    print(f"\nTotal unique flows: {len(flow_labels)}")
+    print(f"Class 1 flows: {(flow_labels['flow_binary_label'] == 1).sum()}")
+    print(f"Class 0 flows: {(flow_labels['flow_binary_label'] == 0).sum()}")
+    
+    # Split class 1 flows
+    flows_c1 = flow_labels[flow_labels['flow_binary_label'] == 1].copy()
+    flows_c0 = flow_labels[flow_labels['flow_binary_label'] == 0].copy()
+    
+    # Split class 1 (minority) - 80/10/10
+    sgkf_c1 = StratifiedGroupKFold(
         n_splits=10, shuffle=True, random_state=random_state
     )
-
-    X_idx = df.index.values
-    y_orig = df['Label'].values         
-    groups = df['flow_id'].values
-
-    train_idx, temp_idx = next(
-        sgkf.split(X_idx, y_orig, groups)
+    X_idx_c1 = flows_c1.index.values
+    y_c1 = flows_c1['Label'].values
+    groups_c1 = flows_c1['flow_id'].values
+    
+    train_idx_c1, temp_idx_c1 = next(
+        sgkf_c1.split(X_idx_c1, y_c1, groups_c1)
     )
-    df_train = df.iloc[train_idx]
-    df_temp  = df.iloc[temp_idx]
-
-    sgkf_2 = StratifiedGroupKFold(
+    flows_train_c1 = flows_c1.iloc[train_idx_c1]
+    flows_temp_c1 = flows_c1.iloc[temp_idx_c1]
+    
+    # Split temp into val and test
+    sgkf_c1_2 = StratifiedGroupKFold(
         n_splits=2, shuffle=True, random_state=random_state
     )
-
-    X_temp_idx = df_temp.index.values
-    y_temp_orig = df_temp['Label'].values
-    g_temp = df_temp['flow_id'].values
-
-    val_idx, test_idx = next(
-        sgkf_2.split(X_temp_idx, y_temp_orig, g_temp)
+    X_temp_idx_c1 = flows_temp_c1.index.values
+    y_temp_c1 = flows_temp_c1['Label'].values
+    g_temp_c1 = flows_temp_c1['flow_id'].values
+    
+    val_idx_c1, test_idx_c1 = next(
+        sgkf_c1_2.split(X_temp_idx_c1, y_temp_c1, g_temp_c1)
     )
-
-    df_val  = df_temp.iloc[val_idx]
-    df_test = df_temp.iloc[test_idx]
-
+    flows_val_c1 = flows_temp_c1.iloc[val_idx_c1]
+    flows_test_c1 = flows_temp_c1.iloc[test_idx_c1]
+    
+    # Split class 0 (majority) - 80/10/10
+    sgkf_c0 = StratifiedGroupKFold(
+        n_splits=10, shuffle=True, random_state=random_state
+    )
+    X_idx_c0 = flows_c0.index.values
+    y_c0 = flows_c0['Label'].values
+    groups_c0 = flows_c0['flow_id'].values
+    
+    train_idx_c0, temp_idx_c0 = next(
+        sgkf_c0.split(X_idx_c0, y_c0, groups_c0)
+    )
+    flows_train_c0 = flows_c0.iloc[train_idx_c0]
+    flows_temp_c0 = flows_c0.iloc[temp_idx_c0]
+    
+    # Split temp into val and test
+    sgkf_c0_2 = StratifiedGroupKFold(
+        n_splits=2, shuffle=True, random_state=random_state
+    )
+    X_temp_idx_c0 = flows_temp_c0.index.values
+    y_temp_c0 = flows_temp_c0['Label'].values
+    g_temp_c0 = flows_temp_c0['flow_id'].values
+    
+    val_idx_c0, test_idx_c0 = next(
+        sgkf_c0_2.split(X_temp_idx_c0, y_temp_c0, g_temp_c0)
+    )
+    flows_val_c0 = flows_temp_c0.iloc[val_idx_c0]
+    flows_test_c0 = flows_temp_c0.iloc[test_idx_c0]
+    
+    # --------------------------------------------------
+    # COMBINE FLOW IDS
+    # --------------------------------------------------
+    train_flow_ids = set(flows_train_c0['flow_id']).union(set(flows_train_c1['flow_id']))
+    val_flow_ids = set(flows_val_c0['flow_id']).union(set(flows_val_c1['flow_id']))
+    test_flow_ids = set(flows_test_c0['flow_id']).union(set(flows_test_c1['flow_id']))
+    
+    # Verify no leakage at flow level
+    assert train_flow_ids.isdisjoint(val_flow_ids), "Train/Val flow leakage!"
+    assert train_flow_ids.isdisjoint(test_flow_ids), "Train/Test flow leakage!"
+    assert val_flow_ids.isdisjoint(test_flow_ids), "Val/Test flow leakage!"
+    print("\n✓ No flow leakage between splits")
+    
+    # --------------------------------------------------
+    # GET ALL PACKETS FOR THESE FLOWS
+    # --------------------------------------------------
+    df_train = df[df['flow_id'].isin(train_flow_ids)].copy()
+    df_val = df[df['flow_id'].isin(val_flow_ids)].copy()
+    df_test = df[df['flow_id'].isin(test_flow_ids)].copy()
+    
+    # Shuffle within each split
+    df_train = df_train.sample(frac=1, random_state=random_state).reset_index(drop=True)
+    df_val = df_val.sample(frac=1, random_state=random_state).reset_index(drop=True)
+    df_test = df_test.sample(frac=1, random_state=random_state).reset_index(drop=True)
+    
     def check_split(name, d):
-        print(f"\n{name} original labels:")
-        print(d['Label'].value_counts(normalize=True).sort_index())
-        print(f"unique flows: {d['flow_id'].nunique()}")
+        print(f"\n{name}:")
+        print(f"  Total samples: {len(d)}")
+        print(f"  Unique flows: {d['flow_id'].nunique()}")
+        print(f"  Binary distribution:")
+        bin_dist = d['binary_label'].value_counts(normalize=True).sort_index()
+        for label, prop in bin_dist.items():
+            print(f"    Class {label}: {prop:.4f} ({prop*100:.2f}%)")
+    
     check_split("Train", df_train)
     check_split("Val", df_val)
     check_split("Test", df_test)
-
-    # safety: zero leakage
-    assert set(df_train.flow_id).isdisjoint(df_val.flow_id)
-    assert set(df_train.flow_id).isdisjoint(df_test.flow_id)
-    assert set(df_val.flow_id).isdisjoint(df_test.flow_id)
-
-    # --------------------------------------------------
-    # BINARY LABEL MAPPING (AFTER SPLIT)
-    # --------------------------------------------------
-    for d in [df_train, df_val, df_test]:
-        d['binary_label'] = d['Label'].isin(labels_of_interest).astype(int)
-
-    print("\n=== Binary distribution AFTER split ===")
-    for name, d in zip(
-        ['Train', 'Val', 'Test'],
-        [df_train, df_val, df_test]
-    ):
-        print(f"\n{name}")
-        print(d['binary_label'].value_counts(normalize=True))
-
+    
+    print("\n=== Binary distribution summary ===")
+    for name, d in zip(['Train', 'Val', 'Test'], [df_train, df_val, df_test]):
+        class1_pct = (d['binary_label'] == 1).sum() / len(d) * 100
+        print(f"{name}: {class1_pct:.2f}% class 1")
+    
     # --------------------------------------------------
     # FEATURES
     # --------------------------------------------------
     drop_cols = ['Label', 'binary_label', 'flow_id', 'flow_id_init', 'file']
     drop_cols = [c for c in drop_cols if c in df_train.columns]
-
+    
     X_train = df_train.drop(columns=drop_cols)
-    X_val   = df_val.drop(columns=drop_cols)
-    X_test  = df_test.drop(columns=drop_cols)
-
+    X_val = df_val.drop(columns=drop_cols)
+    X_test = df_test.drop(columns=drop_cols)
+    
     y_train = df_train['binary_label']
-    y_val   = df_val['binary_label']
-    y_test  = df_test['binary_label']
-
+    y_val = df_val['binary_label']
+    y_test = df_test['binary_label']
+    
     # --------------------------------------------------
     # SCALING (train only)
     # --------------------------------------------------
+    from sklearn.preprocessing import MinMaxScaler
     scaler = MinMaxScaler()
-
     X_train = pd.DataFrame(
         scaler.fit_transform(X_train),
         columns=X_train.columns
@@ -139,11 +212,11 @@ def read_csv(file_path,
         scaler.transform(X_test),
         columns=X_test.columns
     )
-
+    
     X_train = X_train.fillna(-1)
-    X_val   = X_val.fillna(-1)
-    X_test  = X_test.fillna(-1)
-
+    X_val = X_val.fillna(-1)
+    X_test = X_test.fillna(-1)
+    
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 
