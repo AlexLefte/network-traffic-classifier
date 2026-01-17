@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 from sklearn.utils import shuffle
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
-from utils import read_csv
+from utils import read_csv_and_split
 
 
 def compute_metrics(y_true, y_pred, split='Train'):
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     METRIX = np.zeros((Nsim, 12))
 
     # Read and shuffle data
-    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv(
+    X_train_split, Y_train, X_val_split, Y_val, X_test_split, Y_test = read_csv_and_split(
         file_path, labels_of_interest=[14, 15, 16, 17]
     )
     X_train_split, Y_train = shuffle(X_train_split, Y_train, random_state=42)

@@ -23,7 +23,7 @@ def compute_metrics(Y, OUT, split, verbose=False):
     return acc, f1, prec, rec 
 
 
-def read_csv(file_path, 
+def read_csv_and_split(file_path, 
              labels_of_interest=[14,15,16,17], 
              random_state=42):
     # Load CSV
@@ -219,53 +219,47 @@ def read_csv(file_path,
     
     return X_train, y_train, X_val, y_val, X_test, y_test
 
-
-def read_csv_multiclass(file_path, random_state=42):
-    """
-    Read CSV and prepare data for multi-class classification.
-    Maps original labels to 6 categories: chat, email, file, streaming, voip, video_call
-    Stratifies splits by flow_id to prevent data leakage.
-    """
-    # Category mappings
-    CHAT = [0, 1, 21, 2, 3, 4]  # aim, facebook_chat, gmail, hangouts_chat, skype_chat, icq
-    EMAIL = [5]  # email
-    FILE = [6, 7, 8, 9]  # ftps, scp, sftp, skype_file
-    STREAMING = [10, 11, 12, 13]  # netflix, spotify, vimeo, youtube
-    VOIP = [14, 15, 16, 17]  # facebook_audio, hangouts_audio, skype_audio, voipbuster
-    VIDEO_CALL = [18, 19, 20]  # facebook_video, skype_video, hangouts_video
-    
-    # Load CSV
+def read_csv(file_path, labels_of_interest=None):
     df = pd.read_csv(file_path)
+
+    # Keep original label for stratification
+    flow_labels = (
+        df.groupby('flow_id')
+          .agg(Label=('Label', 'first'))
+          .reset_index()
+    )
     
-    # --------- ORIGINAL LABEL DISTRIBUTION ----------
-    print("\n=== Original class distribution ===")
-    class_counts = df['Label'].value_counts().sort_index()
-    class_percent = df['Label'].value_counts(normalize=True).sort_index() * 100
-    print(pd.DataFrame({
-        'count': class_counts,
-        'percent (%)': class_percent.round(2)
-    }))
+    # Add binary label for later
+    if labels_of_interest is not None:
+        flow_labels['binary_label'] = flow_labels['Label'].apply(
+            lambda x: 1 if x in labels_of_interest else 0
+        )
     
-    # --------- MULTI-CLASS LABEL MAPPING ----------
-    def map_label_to_category(label):
-        if label in CHAT:
-            return 0  # chat
-        elif label in EMAIL:
-            return 1  # email
-        elif label in FILE:
-            return 2  # file
-        elif label in STREAMING:
-            return 3  # streaming
-        elif label in VOIP:
-            return 4  # voip
-        elif label in VIDEO_CALL:
-            return 5  # video_call
-        else:
-            return -1  # unknown
-    
-    df['multiclass_label'] = df['Label'].apply(map_label_to_category)
-    
-    # Category names for display
+    return df, flow_labels
+
+def read_csv_multiclass(
+    file_path,
+    random_state=42
+):
+    # -------------------------
+    # LABEL GROUPS
+    # -------------------------
+    CHAT = [0, 1, 21, 2, 3, 4]
+    EMAIL = [5]
+    FILE = [6, 7, 8, 9]
+    STREAMING = [10, 11, 12, 13]
+    VOIP = [14, 15, 16, 17]
+    VIDEO_CALL = [18, 19, 20]
+
+    def map_label(label):
+        if label in CHAT: return 0
+        if label in EMAIL: return 1
+        if label in FILE: return 2
+        if label in STREAMING: return 3
+        if label in VOIP: return 4
+        if label in VIDEO_CALL: return 5
+        return -1
+
     category_names = {
         0: 'chat',
         1: 'email',
@@ -274,125 +268,126 @@ def read_csv_multiclass(file_path, random_state=42):
         4: 'voip',
         5: 'video_call'
     }
-    
-    # --------- MULTI-CLASS DISTRIBUTION ----------
-    print("\n=== Multi-class distribution ===")
-    mc_counts = df['multiclass_label'].value_counts().sort_index()
-    mc_percent = df['multiclass_label'].value_counts(normalize=True).sort_index() * 100
-    print(pd.DataFrame({
-        'category': [category_names.get(i, 'unknown') for i in mc_counts.index],
-        'count': mc_counts.values,
-        'percent (%)': mc_percent.round(2).values
-    }))
-    
-    # --------- FLOW-BASED STRATIFIED SPLIT ----------
-    # Get unique flows with their labels
+
+    # -------------------------
+    # LOAD CSV
+    # -------------------------
+    df = pd.read_csv(file_path)
+
+    df['multiclass_label'] = df['Label'].apply(map_label)
+
     flow_col = 'flow_id' if 'flow_id' in df.columns else 'flow_id_init'
-    flow_labels = df.groupby(flow_col)['multiclass_label'].first()
-    
-    print(f"\n=== Flow-based split (using '{flow_col}') ===")
-    print(f"Total unique flows: {len(flow_labels)}")
-    
-    # Split flows (not individual samples) - stratified by class
-    flow_train, flow_temp, y_flow_train, y_flow_temp = train_test_split(
-        flow_labels.index, 
-        flow_labels.values,
-        test_size=0.3, 
-        random_state=random_state, 
-        stratify=flow_labels.values
+
+    # -------------------------
+    # ORIGINAL DISTRIBUTION
+    # -------------------------
+    print("\n=== Multi-class distribution (full dataset) ===")
+    counts = df['multiclass_label'].value_counts().sort_index()
+    perc = df['multiclass_label'].value_counts(normalize=True).sort_index() * 100
+    print(pd.DataFrame({
+        'category': [category_names[i] for i in counts.index],
+        'count': counts.values,
+        'percent (%)': perc.round(2).values
+    }))
+
+    # -------------------------
+    # STRATIFIED GROUP SPLIT
+    # -------------------------
+    sgkf = StratifiedGroupKFold(
+        n_splits=10,
+        shuffle=True,
+        random_state=random_state
     )
-    
-    flow_val, flow_test, y_flow_val, y_flow_test = train_test_split(
-        flow_temp, 
-        y_flow_temp,
-        test_size=0.5, 
-        random_state=random_state, 
-        stratify=y_flow_temp
+
+    X_idx = df.index.values
+    y = df['multiclass_label'].values
+    groups = df[flow_col].values
+
+    train_idx, temp_idx = next(sgkf.split(X_idx, y, groups))
+
+    df_train = df.iloc[train_idx]
+    df_temp = df.iloc[temp_idx]
+
+    # second split: val / test
+    sgkf_2 = StratifiedGroupKFold(
+        n_splits=2,
+        shuffle=True,
+        random_state=random_state
     )
-    
-    # Create train/val/test sets based on flow assignments
-    train_mask = df[flow_col].isin(flow_train)
-    val_mask = df[flow_col].isin(flow_val)
-    test_mask = df[flow_col].isin(flow_test)
-    
-    # Prepare features
-    columns = []
-    to_be_removed = ['Label', 'multiclass_label', 'binary_label', 'Category', 'flow_id', 'flow_id_init', 'file']
-    for c in to_be_removed:
-        if c in df.columns:
-            columns.append(c)
-    
-    X = df.drop(columns=columns)
-    y = df['multiclass_label']
-    
-    X_train = X[train_mask]
-    y_train = y[train_mask]
-    X_val = X[val_mask]
-    y_val = y[val_mask]
-    X_test = X[test_mask]
-    y_test = y[test_mask]
-    
-    # --------- SPLIT DISTRIBUTIONS ----------
-    print("\n=== Split distributions (multi-class) ===")
-    for name, labels in zip(
-        ['Train', 'Val', 'Test'],
-        [y_train, y_val, y_test]
-    ):
-        counts = labels.value_counts().sort_index()
-        perc = labels.value_counts(normalize=True).sort_index() * 100
-        print(f"\n{name}: {len(labels)} samples")
-        print(pd.DataFrame({
-            'category': [category_names.get(i, 'unknown') for i in counts.index],
-            'count': counts.values,
-            'percent (%)': perc.round(2).values
-        }))
-    
-    # Min-Max normalization on train
+
+    temp_idx2 = df_temp.index.values
+    y_temp = df_temp['multiclass_label'].values
+    g_temp = df_temp[flow_col].values
+
+    val_idx, test_idx = next(sgkf_2.split(temp_idx2, y_temp, g_temp))
+
+    df_val = df_temp.iloc[val_idx]
+    df_test = df_temp.iloc[test_idx]
+
+    # -------------------------
+    # SANITY CHECK
+    # -------------------------
+    def check_split(name, d):
+        print(f"\n{name}")
+        print(d['multiclass_label'].value_counts(normalize=True).sort_index())
+        print(f"unique flows: {d[flow_col].nunique()}")
+
+    check_split("Train", df_train)
+    check_split("Val", df_val)
+    check_split("Test", df_test)
+
+    assert set(df_train[flow_col]).isdisjoint(df_val[flow_col])
+    assert set(df_train[flow_col]).isdisjoint(df_test[flow_col])
+    assert set(df_val[flow_col]).isdisjoint(df_test[flow_col])
+
+    # -------------------------
+    # FEATURES
+    # -------------------------
+    drop_cols = [
+        'Label',
+        'multiclass_label',
+        'binary_label',
+        'flow_id',
+        'flow_id_init',
+        'file'
+    ]
+    drop_cols = [c for c in drop_cols if c in df.columns]
+
+    X_train = df_train.drop(columns=drop_cols)
+    X_val   = df_val.drop(columns=drop_cols)
+    X_test  = df_test.drop(columns=drop_cols)
+
+    y_train = df_train['multiclass_label']
+    y_val   = df_val['multiclass_label']
+    y_test  = df_test['multiclass_label']
+
+    # -------------------------
+    # SCALING (TRAIN ONLY)
+    # -------------------------
     scaler = MinMaxScaler()
-    X_train_scaled = pd.DataFrame(
+
+    X_train = pd.DataFrame(
         scaler.fit_transform(X_train),
-        columns=X_train.columns,
-        index=X_train.index
+        columns=X_train.columns
     )
-    
-    # Apply transform on val and test
-    X_val_scaled = pd.DataFrame(
+    X_val = pd.DataFrame(
         scaler.transform(X_val),
-        columns=X_val.columns,
-        index=X_val.index
+        columns=X_val.columns
     )
-    X_test_scaled = pd.DataFrame(
+    X_test = pd.DataFrame(
         scaler.transform(X_test),
-        columns=X_test.columns,
-        index=X_test.index
+        columns=X_test.columns
     )
-    
-    # Replace invalid data with -1
-    X_train_scaled = X_train_scaled.fillna(-1)
-    X_val_scaled = X_val_scaled.fillna(-1)
-    X_test_scaled = X_test_scaled.fillna(-1)
-    
-    # --------- CLASS WEIGHTS ----------
-    # Calculate class weights for imbalanced classes
-    from sklearn.utils.class_weight import compute_class_weight
-    
-    class_weights = compute_class_weight(
-        class_weight='balanced',
-        classes=np.unique(y_train),
-        y=y_train
+
+    X_train = X_train.fillna(-1)
+    X_val   = X_val.fillna(-1)
+    X_test  = X_test.fillna(-1)
+
+    return (
+        X_train, y_train,
+        X_val, y_val,
+        X_test, y_test
     )
-    class_weight_dict = dict(enumerate(class_weights))
-    
-    print("\n=== Class weights (balanced) ===")
-    for cls, weight in class_weight_dict.items():
-        print(f"{category_names.get(cls, 'unknown'):12s}: {weight:.4f}")
-    
-    print("\n=== Data preparation complete ===")
-    print(f"Number of classes: {y.nunique()}")
-    print(f"Feature dimensions: {X_train_scaled.shape[1]}")
-    print(f"Split by flow_id to prevent data leakage")
-    
-    return X_train_scaled, y_train, X_val_scaled, y_val, X_test_scaled, y_test, class_weight_dict
 
 
 from scipy.io import arff
