@@ -72,7 +72,6 @@ def main():
 
     # Sort files ascending by size
     pcap_files.sort(key=lambda f: os.path.getsize(f))
-    # pcap_files = pcap_files[-4:]
 
     # Process each PCAP file
     for pcap_path in tqdm(pcap_files):

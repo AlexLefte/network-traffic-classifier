@@ -4,7 +4,7 @@ import argparse
 import numpy  as np
 import pandas as pd
 #
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.svm                import SVC
 from sklearn.decomposition      import PCA
 from sklearn.utils              import shuffle
@@ -62,7 +62,8 @@ def run_cv_config(
         X_val = df_va.drop(columns=drop_cols)
         y_val = df_va['binary_label']
 
-        scaler = MinMaxScaler()
+        # Scale features
+        scaler = StandardScaler()
         X_tr = scaler.fit_transform(X_tr)
         X_val = scaler.transform(X_val)
 
@@ -77,6 +78,8 @@ def run_cv_config(
             pca = PCA(n_components=pca_comp)
             X_tr = pca.fit_transform(X_tr)
             X_val = pca.transform(X_val)
+            print(f"  -> PCA applied: {X_tr.shape[1]} components kept")
+            exit(1)
 
         weights = compute_sample_weight('balanced', y_tr)
 
@@ -122,11 +125,10 @@ if __name__ == "__main__":
     parser.add_argument("--smote", action='store_true')
     args = parser.parse_args()
 
-    PCA_components = ['no_pca']
+    PCA_components = [0.95]
     SVM_kernels = ['rbf']
     Cs = [100, 50, 20, 10, 1, 0.1, 0.01, 0.001]
     gammas = ['scale']
-
     class_of_interest = [14, 15, 16, 17]
 
     df, flow_labels = read_csv(
@@ -134,78 +136,69 @@ if __name__ == "__main__":
         labels_of_interest=class_of_interest
     )
 
-    METRIX = []
-    sim_list = []
+    os.makedirs("results", exist_ok=True)
+    out_path = "results/SVC_CV_results_minmax.csv"
+    append_mode = os.path.exists(out_path)
 
     idx_sim = 0
     best_f1 = -np.inf
     best_idx = -1
 
-    for pca_comp in PCA_components:
-        for kernel in SVM_kernels:
-            for C in Cs:
-                for gamma in gammas:
+    # Deschide CSV-ul pentru scriere incrementală
+    for smote in [False, True]:
+        for pca_comp in PCA_components:
+            for kernel in SVM_kernels:
+                for C in Cs:
+                    for gamma in gammas:
 
-                    train_acc, train_f1, train_prec, train_rec, \
-                        val_acc, val_f1, val_prec, val_rec = run_cv_config(
-                        df,
-                        flow_labels,
-                        pca_comp,
-                        kernel,
-                        C,
-                        gamma,
-                        labels_of_interest=class_of_interest, 
-                        n_folds=4,
-                        use_smote=args.smote
-                    )
+                        train_acc, train_f1, train_prec, train_rec, \
+                            val_acc, val_f1, val_prec, val_rec = run_cv_config(
+                            df,
+                            flow_labels,
+                            pca_comp,
+                            kernel,
+                            C,
+                            gamma,
+                            labels_of_interest=class_of_interest, 
+                            n_folds=4,
+                            use_smote=smote
+                        )
 
-                    METRIX.append([
-                        train_acc, train_f1, train_prec, train_rec,
-                        val_acc, val_f1, val_prec, val_rec
-                    ])
+                        row = pd.DataFrame([{
+                            'SIM': idx_sim,
+                            'PCA_components': pca_comp,
+                            'kernel': kernel,
+                            'C': C,
+                            'gamma': gamma,
+                            'smote': smote,
 
-                    sim_list.append([
-                        idx_sim, pca_comp, kernel, C, gamma
-                    ])
+                            'train_acc': train_acc,
+                            'train_f1': train_f1,
+                            'train_prec': train_prec,
+                            'train_rec': train_rec,
 
-                    if val_f1 > best_f1:
-                        best_f1 = val_f1
-                        best_idx = idx_sim
-                        print(f"\nNEW BEST: SIM={idx_sim} | F1={val_f1:.3f}")
+                            'val_acc': val_acc,
+                            'val_f1': val_f1,
+                            'val_prec': val_prec,
+                            'val_rec': val_rec
+                        }])
 
-                    idx_sim += 1
+                        # Scrie imediat în CSV
+                        row.to_csv(out_path, mode='a', header=not append_mode, index=False)
+                        append_mode = True  # ulterior doar append
 
-    METRIX = np.array(METRIX)
-    sim_list = np.array(sim_list, dtype=object)
+                        if val_f1 > best_f1:
+                            best_f1 = val_f1
+                            best_idx = idx_sim
+                            print(f"\nNEW BEST: SIM={idx_sim} | F1={val_f1:.3f}")
 
-    df_results = pd.DataFrame({
-        'SIM': sim_list[:,0],
-        'PCA_components': sim_list[:,1],
-        'kernel': sim_list[:,2],
-        'C': sim_list[:,3],
-        'gamma': sim_list[:,4],
-        'smote': args.smote,
-
-        # Train stats
-        'train_acc': METRIX[:,0],
-        'train_f1':  METRIX[:,1],
-        'train_prec': METRIX[:,2],
-        'train_rec':  METRIX[:,3],
-
-        # Val stats
-        'val_acc': METRIX[:,4],
-        'val_f1':  METRIX[:,5], 
-        'val_prec': METRIX[:,6],
-        'val_rec':  METRIX[:,7],
-    })
-
-    os.makedirs("results", exist_ok=True)
-    out_path = "results/SVC_CV_results.csv"
-    if os.path.exists(out_path):
-        df_results.to_csv(out_path, mode='a', header=False, index=False)
-    else:
-        df_results.to_csv(out_path, index=False)
+                        idx_sim += 1
 
     print("\nDONE")
-    print("Best config:")
-    print(df_results.iloc[best_idx])
+
+    # Citește CSV-ul final și află best config
+    df_final = pd.read_csv(out_path)
+    best_row = df_final.iloc[df_final['val_f1'].idxmax()]
+
+    print("\nBest config from CSV:")
+    print(best_row)

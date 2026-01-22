@@ -219,22 +219,20 @@ def read_csv_and_split(file_path,
     
     return X_train, y_train, X_val, y_val, X_test, y_test
 
-def read_csv(file_path, labels_of_interest=None):
+def read_csv(file_path):
+    """Read CSV and create flow labels"""
     df = pd.read_csv(file_path)
 
-    # Keep original label for stratification
+    if 'flow_id' not in df.columns:
+        df = df.copy()
+        df['flow_id'] = df.index   # artificial flow id if not present
+
     flow_labels = (
         df.groupby('flow_id')
-          .agg(Label=('Label', 'first'))
-          .reset_index()
+        .agg(Label=('Label', 'first'))
+        .reset_index()
     )
-    
-    # Add binary label for later
-    if labels_of_interest is not None:
-        flow_labels['binary_label'] = flow_labels['Label'].apply(
-            lambda x: 1 if x in labels_of_interest else 0
-        )
-    
+        
     return df, flow_labels
 
 def read_csv_multiclass(
